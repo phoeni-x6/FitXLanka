@@ -1,20 +1,27 @@
 
+import Image from "next/image";
 import Link from "next/link";
-import { Dumbbell, ArrowUpRight } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 
 export default function Footer() {
   return (
     <footer className="border-t border-white/10 bg-[#131513]">
       <div className="mx-auto max-w-7xl px-5 py-12 lg:px-8">
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
+          {/* Brand section */}
           <div className="lg:col-span-2">
-            <Link href="/" className="inline-flex items-center gap-2">
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-lime text-brand-charcoal">
-                <Dumbbell size={22} />
-              </span>
-              <span className="font-black">
-                Fit<span className="text-brand-lime">XLanka</span>
-              </span>
+            <Link
+              href="/"
+              aria-label="FitX Lanka home"
+              className="inline-flex items-center"
+            >
+              <Image
+                src="/images/fitx-lanka-logo.png.png"
+                alt="FitX Lanka"
+                width={200}
+                height={67}
+                className="h-12 w-auto object-contain"
+              />
             </Link>
 
             <p className="mt-4 max-w-sm text-sm leading-6 text-gray-400">
@@ -22,13 +29,14 @@ export default function Footer() {
               across Sri Lanka. Start your fitness journey on your terms.
             </p>
 
+            {/* Social links */}
             <div className="mt-5 flex gap-3">
               <a
                 href="https://www.instagram.com/"
                 target="_blank"
-                rel="noreferrer"
+                rel="noopener noreferrer"
                 aria-label="Instagram"
-                className="rounded-lg border border-white/10 p-2.5 text-gray-400 transition hover:text-brand-lime"
+                className="rounded-lg border border-white/10 p-2.5 text-gray-400 transition hover:border-brand-lime/40 hover:text-brand-lime"
               >
                 <svg
                   aria-hidden="true"
@@ -41,15 +49,22 @@ export default function Footer() {
                 >
                   <rect x="3" y="3" width="18" height="18" rx="5" />
                   <circle cx="12" cy="12" r="4" />
-                  <circle cx="17.5" cy="6.5" r="0.75" fill="currentColor" stroke="none" />
+                  <circle
+                    cx="17.5"
+                    cy="6.5"
+                    r="0.75"
+                    fill="currentColor"
+                    stroke="none"
+                  />
                 </svg>
               </a>
+
               <a
                 href="https://www.facebook.com/"
                 target="_blank"
-                rel="noreferrer"
+                rel="noopener noreferrer"
                 aria-label="Facebook"
-                className="rounded-lg border border-white/10 p-2.5 text-gray-400 transition hover:text-brand-lime"
+                className="rounded-lg border border-white/10 p-2.5 text-gray-400 transition hover:border-brand-lime/40 hover:text-brand-lime"
               >
                 <svg
                   aria-hidden="true"
@@ -64,47 +79,71 @@ export default function Footer() {
             </div>
           </div>
 
+          {/* Discover links */}
           <div>
-            <h3 className="font-bold">Discover</h3>
+            <h3 className="font-bold text-white">Discover</h3>
+
             <div className="mt-4 flex flex-col gap-3 text-sm text-gray-400">
-              <Link href="/trainers" className="hover:text-brand-lime">
+              <Link
+                href="/trainers"
+                className="transition hover:text-brand-lime"
+              >
                 Personal trainers
               </Link>
-              <Link href="/gyms" className="hover:text-brand-lime">
+
+              <Link
+                href="/gyms"
+                className="transition hover:text-brand-lime"
+              >
                 Gyms and fitness clubs
               </Link>
-              <Link href="/bookings" className="hover:text-brand-lime">
+
+              <Link
+                href="/bookings"
+                className="transition hover:text-brand-lime"
+              >
                 My bookings
               </Link>
             </div>
           </div>
 
+          {/* Get involved links */}
           <div>
-            <h3 className="font-bold">Get involved</h3>
+            <h3 className="font-bold text-white">Get involved</h3>
+
             <div className="mt-4 flex flex-col gap-3 text-sm text-gray-400">
-              <Link href="/register" className="hover:text-brand-lime">
+              <Link
+                href="/register"
+                className="transition hover:text-brand-lime"
+              >
                 Join as a member
               </Link>
+
               <Link
                 href="/register?role=trainer"
-                className="inline-flex items-center gap-1 hover:text-brand-lime"
+                className="inline-flex items-center gap-1 transition hover:text-brand-lime"
               >
-                Become a trainer <ArrowUpRight size={14} />
+                Become a trainer
+                <ArrowUpRight size={14} />
               </Link>
+
               <Link
                 href="/register?role=gym"
-                className="inline-flex items-center gap-1 hover:text-brand-lime"
+                className="inline-flex items-center gap-1 transition hover:text-brand-lime"
               >
-                List your gym <ArrowUpRight size={14} />
+                List your gym
+                <ArrowUpRight size={14} />
               </Link>
             </div>
           </div>
         </div>
 
+        {/* Copyright */}
         <div className="mt-12 flex flex-col gap-3 border-t border-white/10 pt-6 text-xs text-gray-500 sm:flex-row sm:items-center sm:justify-between">
           <p>
-            © {new Date().getFullYear()} FitXLanka. All rights reserved.
+            © {new Date().getFullYear()} FitX Lanka. All rights reserved.
           </p>
+
           <p>Built for the fitness community in Sri Lanka.</p>
         </div>
       </div>

@@ -1,8 +1,9 @@
 
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
-import { Dumbbell, Menu, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { useState } from "react";
 
 const links = [
@@ -17,15 +18,23 @@ export default function Navbar() {
   return (
     <header className="sticky top-0 z-50 border-b border-white/10 bg-brand-charcoal/95 backdrop-blur-lg">
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 lg:px-8">
-        <Link href="/" className="flex items-center gap-2">
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-lime text-brand-charcoal">
-            <Dumbbell size={23} strokeWidth={2.5} />
-          </span>
-          <span className="text-lg font-black tracking-tight">
-            Fit<span className="text-brand-lime">XLanka</span>
-          </span>
+        {/* Logo */}
+        <Link
+          href="/"
+          aria-label="FitX Lanka home"
+          className="relative flex shrink-0 items-center"
+        >
+          <Image
+            src="/images/fitx-lanka-logo.png.png"
+            alt="FitX Lanka"
+            width={180}
+            height={60}
+            priority
+            className="h-10 w-auto object-contain sm:h-12"
+          />
         </Link>
 
+        {/* Desktop navigation */}
         <div className="hidden items-center gap-8 md:flex">
           {links.map((link) => (
             <Link
@@ -38,6 +47,7 @@ export default function Navbar() {
           ))}
         </div>
 
+        {/* Desktop actions */}
         <div className="hidden items-center gap-3 md:flex">
           <Link
             href="/login"
@@ -45,6 +55,7 @@ export default function Navbar() {
           >
             Log in
           </Link>
+
           <Link
             href="/register"
             className="rounded-full bg-brand-lime px-5 py-2.5 text-sm font-bold text-brand-charcoal transition hover:bg-white"
@@ -53,41 +64,51 @@ export default function Navbar() {
           </Link>
         </div>
 
+        {/* Mobile menu button */}
         <button
           type="button"
           aria-label={menuOpen ? "Close menu" : "Open menu"}
           aria-expanded={menuOpen}
-          onClick={() => setMenuOpen(!menuOpen)}
-          className="rounded-lg p-2 text-white md:hidden"
+          aria-controls="mobile-navigation"
+          onClick={() => setMenuOpen((open) => !open)}
+          className="rounded-lg p-2 text-white transition hover:text-brand-lime md:hidden"
         >
           {menuOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
       </nav>
 
+      {/* Mobile navigation */}
       {menuOpen && (
-        <div className="border-t border-white/10 px-5 py-4 md:hidden">
+        <div
+          id="mobile-navigation"
+          className="border-t border-white/10 px-5 py-4 md:hidden"
+        >
           <div className="flex flex-col gap-4">
             {links.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
                 onClick={() => setMenuOpen(false)}
-                className="text-sm text-gray-200 hover:text-brand-lime"
+                className="text-sm text-gray-200 transition hover:text-brand-lime"
               >
                 {link.label}
               </Link>
             ))}
+
+            <div className="my-1 border-t border-white/10" />
+
             <Link
               href="/login"
               onClick={() => setMenuOpen(false)}
-              className="text-sm text-gray-200"
+              className="text-sm text-gray-200 transition hover:text-brand-lime"
             >
               Log in
             </Link>
+
             <Link
               href="/register"
               onClick={() => setMenuOpen(false)}
-              className="rounded-full bg-brand-lime px-5 py-3 text-center text-sm font-bold text-brand-charcoal"
+              className="rounded-full bg-brand-lime px-5 py-3 text-center text-sm font-bold text-brand-charcoal transition hover:bg-white"
             >
               Get started
             </Link>
