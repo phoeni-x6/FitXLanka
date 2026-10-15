@@ -10,6 +10,7 @@ const links = [
   { label: "Find Trainers", href: "/trainers" },
   { label: "Explore Gyms", href: "/gyms" },
   { label: "Bookings", href: "/bookings" },
+  { label: "About Us", href: "/about" },
 ];
 
 export default function Navbar() {

@@ -12,8 +12,12 @@ import AdminSidebar from "@/components/admin/AdminSidebar";
 import AdminStats from "@/components/admin/AdminStats";
 import PendingApprovals from "@/components/admin/PendingApprovals";
 import RecentActivity from "@/components/admin/RecentActivity";
+import { requireRole } from "@/lib/auth/require-role";
 
-export default function AdminDashboardPage() {
+export default async function AdminDashboardPage() {
+  // Verify the user's session and admin role on the server.
+  await requireRole("admin");
+
   return (
     <main className="min-h-screen bg-[#171A18] px-4 py-6 text-[#F4F5F0] sm:px-6 lg:px-8">
       <div className="mx-auto max-w-[1600px]">
@@ -86,6 +90,7 @@ export default function AdminDashboardPage() {
                 <h2 className="text-lg font-semibold text-white">
                   Platform statistics
                 </h2>
+
                 <p className="mt-1 text-sm text-white/40">
                   Illustrative figures for the dashboard prototype.
                 </p>
@@ -106,6 +111,7 @@ export default function AdminDashboardPage() {
                 <h2 className="text-lg font-semibold text-white">
                   Quick access
                 </h2>
+
                 <p className="mt-1 text-sm text-white/40">
                   Jump to the main management areas.
                 </p>
@@ -122,6 +128,7 @@ export default function AdminDashboardPage() {
                     <h3 className="font-semibold text-white">
                       Trainer approvals
                     </h3>
+
                     <ArrowUpRight className="h-4 w-4 text-white/35 transition group-hover:-translate-y-1 group-hover:translate-x-1 group-hover:text-[#C7F36B]" />
                   </div>
 
@@ -140,6 +147,7 @@ export default function AdminDashboardPage() {
                     <h3 className="font-semibold text-white">
                       Gym approvals
                     </h3>
+
                     <ArrowUpRight className="h-4 w-4 text-white/35 transition group-hover:-translate-y-1 group-hover:translate-x-1 group-hover:text-[#C7F36B]" />
                   </div>
 
@@ -158,6 +166,7 @@ export default function AdminDashboardPage() {
                     <h3 className="font-semibold text-white">
                       User management
                     </h3>
+
                     <ArrowUpRight className="h-4 w-4 text-white/35 transition group-hover:-translate-y-1 group-hover:translate-x-1 group-hover:text-[#C7F36B]" />
                   </div>
 
@@ -171,10 +180,10 @@ export default function AdminDashboardPage() {
             {/* Prototype disclaimer */}
             <div className="rounded-xl border border-amber-400/15 bg-amber-400/5 px-4 py-3">
               <p className="text-xs leading-5 text-amber-200/75">
-                <strong>Prototype notice:</strong> All statistics,
-                approval requests, and activity events are sample data.
-                This page does not provide authentication, real account
-                management, or persistent changes.
+                <strong>Prototype notice:</strong> Authentication and
+                server-side role checks are connected. Statistics,
+                approval requests, and activity events remain sample
+                data; real account management is not yet connected.
               </p>
             </div>
           </div>

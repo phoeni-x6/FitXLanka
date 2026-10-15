@@ -1,7 +1,9 @@
+
 "use client";
 
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowRight,
   Check,
@@ -10,7 +12,9 @@ import {
   UserRound,
   Eye,
   EyeOff,
+  LoaderCircle,
 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
 type Role = "client" | "trainer" | "gym";
 
@@ -33,18 +37,20 @@ const roles: {
   {
     value: "trainer",
     title: "Personal trainer",
-    description: "Showcase your services",
+    description: "Request a trainer profile",
     icon: Dumbbell,
   },
   {
     value: "gym",
     title: "Gym owner",
-    description: "Promote your fitness facility",
+    description: "Request a gym listing",
     icon: Building2,
   },
 ];
 
 export default function RegisterForm({ initialRole }: Props) {
+  const router = useRouter();
+
   const [role, setRole] = useState<Role>(initialRole);
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -53,33 +59,79 @@ export default function RegisterForm({ initialRole }: Props) {
   const [showPassword, setShowPassword] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [emailConfirmationRequired, setEmailConfirmationRequired] =
+    useState(false);
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  const inputClass =
+    "mt-2 w-full rounded-xl border border-white/10 bg-[#171A18] px-4 py-3.5 text-sm text-[#F4F5F0] outline-none transition placeholder:text-white/30 focus:border-[#C7F36B]";
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage("");
+    setError("");
 
     if (password.length < 8) {
-      setMessage("Your password must contain at least 8 characters.");
+      setError("Your password must contain at least 8 characters.");
       return;
     }
 
     if (password !== confirmPassword) {
-      setMessage("Your passwords do not match.");
+      setError("Your passwords do not match.");
       return;
     }
 
     if (!acceptedTerms) {
-      setMessage("Please accept the terms to continue.");
+      setError("Please accept the terms to continue.");
       return;
     }
 
-    // UI prototype only. No account is created or data transmitted.
-    setSubmitted(true);
-  }
+    setLoading(true);
 
-  const inputClass =
-    "mt-2 w-full rounded-xl border border-white/10 bg-[#171A18] px-4 py-3.5 text-sm text-[#F4F5F0] outline-none transition placeholder:text-white/30 focus:border-[#C7F36B]";
+    try {
+      const supabase = createClient();
+
+      const { data, error: signUpError } =
+        await supabase.auth.signUp({
+          email: email.trim().toLowerCase(),
+          password,
+          options: {
+            data: {
+              display_name: fullName.trim(),
+            },
+          },
+        });
+
+      if (signUpError) {
+        setError(signUpError.message);
+        return;
+      }
+
+      if (!data.user) {
+        setError("We couldn't create your account. Please try again.");
+        return;
+      }
+
+      // Role selection is intentionally NOT sent as trusted user metadata.
+      // The database trigger assigns every new account the client role.
+      if (!data.session) {
+        setEmailConfirmationRequired(true);
+        setSubmitted(true);
+        return;
+      }
+
+      setMessage("Your account has been created.");
+      setSubmitted(true);
+    } catch {
+      setError(
+        "Unable to connect to the authentication service. Check your connection and try again."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
 
   if (submitted) {
     return (
@@ -88,34 +140,48 @@ export default function RegisterForm({ initialRole }: Props) {
           <Check size={28} className="text-[#C7F36B]" />
         </div>
 
-        <h2 className="mt-5 text-2xl font-semibold">Form completed</h2>
+        <h2 className="mt-5 text-2xl font-semibold">
+          {emailConfirmationRequired
+            ? "Check your email"
+            : "Account created"}
+        </h2>
+
         <p className="mt-3 text-sm leading-6 text-white/55">
-          This is a registration preview for {fullName}. No account has
-          been created and no information has been sent to a server.
+          {emailConfirmationRequired
+            ? `We've requested an account for ${email}. Follow the confirmation link in your email before signing in.`
+            : `Welcome to FitX Lanka, ${fullName.trim()}. Your account has been created.`}
         </p>
 
         <div className="mt-6 rounded-xl border border-white/10 bg-[#171A18] p-4 text-left">
-          <p className="text-xs text-white/40">Selected account type</p>
+          <p className="text-xs text-white/40">Requested account type</p>
           <p className="mt-1 font-medium">
             {roles.find((item) => item.value === role)?.title}
           </p>
+
           <p className="mt-3 text-xs text-white/40">Email address</p>
-          <p className="mt-1 text-sm">{email}</p>
+          <p className="mt-1 break-all text-sm">{email}</p>
+
+          <p className="mt-3 text-xs text-white/40">Account permissions</p>
+          <p className="mt-1 text-sm text-white/65">
+            Your initial role is Client. Trainer and gym-owner permissions
+            require separate authorization.
+          </p>
         </div>
 
         {role !== "client" && (
           <p className="mt-4 text-xs leading-5 text-white/45">
-            In the live platform, trainer and gym profiles will require
-            administrator approval before becoming publicly visible.
+            Your selection is a request to become a {role === "trainer"
+              ? "trainer"
+              : "gym owner"}. It does not grant those permissions or create a public listing yet.
           </p>
         )}
 
         <button
           type="button"
-          onClick={() => setSubmitted(false)}
-          className="mt-6 rounded-xl bg-[#C7F36B] px-5 py-3 text-sm font-semibold text-[#171A18] transition hover:bg-[#d5fa8b]"
+          onClick={() => router.push("/login")}
+          className="mt-6 w-full rounded-xl bg-[#C7F36B] px-5 py-3 text-sm font-semibold text-[#171A18] transition hover:bg-[#d5fa8b]"
         >
-          Back to form
+          Continue to sign in
         </button>
       </div>
     );
@@ -136,7 +202,7 @@ export default function RegisterForm({ initialRole }: Props) {
         </p>
       </div>
 
-      <fieldset>
+      <fieldset disabled={loading}>
         <legend className="mb-3 text-sm font-medium text-white/75">
           I want to join as a...
         </legend>
@@ -202,10 +268,12 @@ export default function RegisterForm({ initialRole }: Props) {
             name="fullName"
             autoComplete="name"
             required
+            maxLength={100}
             value={fullName}
             onChange={(event) => setFullName(event.target.value)}
             placeholder="Your full name"
             className={inputClass}
+            disabled={loading}
           />
         </div>
 
@@ -219,10 +287,12 @@ export default function RegisterForm({ initialRole }: Props) {
             type="email"
             autoComplete="email"
             required
+            maxLength={254}
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             placeholder="you@example.com"
             className={inputClass}
+            disabled={loading}
           />
         </div>
 
@@ -243,6 +313,7 @@ export default function RegisterForm({ initialRole }: Props) {
               onChange={(event) => setPassword(event.target.value)}
               placeholder="At least 8 characters"
               className={`${inputClass} pr-12`}
+              disabled={loading}
             />
 
             <button
@@ -257,10 +328,7 @@ export default function RegisterForm({ initialRole }: Props) {
         </div>
 
         <div>
-          <label
-            htmlFor="confirmPassword"
-            className="text-sm text-white/70"
-          >
+          <label htmlFor="confirmPassword" className="text-sm text-white/70">
             Confirm password
           </label>
           <input
@@ -274,6 +342,7 @@ export default function RegisterForm({ initialRole }: Props) {
             onChange={(event) => setConfirmPassword(event.target.value)}
             placeholder="Enter your password again"
             className={inputClass}
+            disabled={loading}
           />
         </div>
       </div>
@@ -284,32 +353,42 @@ export default function RegisterForm({ initialRole }: Props) {
           checked={acceptedTerms}
           onChange={(event) => setAcceptedTerms(event.target.checked)}
           className="mt-1 accent-[#C7F36B]"
+          disabled={loading}
         />
         <span>
           I agree to the platform&apos;s terms of service and privacy policy.
         </span>
       </label>
 
-      {message && (
+      {error && (
         <p
           role="alert"
           className="mt-4 rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-300"
         >
-          {message}
+          {error}
         </p>
       )}
 
       <button
         type="submit"
-        className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-[#C7F36B] px-5 py-4 text-sm font-semibold text-[#171A18] transition hover:bg-[#d5fa8b]"
+        disabled={loading}
+        className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-[#C7F36B] px-5 py-4 text-sm font-semibold text-[#171A18] transition hover:bg-[#d5fa8b] disabled:cursor-not-allowed disabled:opacity-60"
       >
-        Create account
-        <ArrowRight size={17} />
+        {loading ? (
+          <>
+            <LoaderCircle size={17} className="animate-spin" />
+            Creating account...
+          </>
+        ) : (
+          <>
+            Create account
+            <ArrowRight size={17} />
+          </>
+        )}
       </button>
 
       <p className="mt-4 text-center text-xs leading-5 text-white/35">
-        UI prototype only. Authentication will be enabled during the
-        Clerk integration stage.
+        Registration is powered by Supabase Auth. Email confirmation may be required.
       </p>
 
       <p className="mt-6 text-center text-sm text-white/50">

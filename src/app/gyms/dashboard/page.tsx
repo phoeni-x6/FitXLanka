@@ -13,14 +13,19 @@ import GymOwnerSidebar from "@/components/gym-dashboard/GymOwnerSidebar";
 import GymOwnerStats from "@/components/gym-dashboard/GymOwnerStats";
 import GymEnquiries from "@/components/gym-dashboard/GymEnquiries";
 import GymVisits from "@/components/gym-dashboard/GymVisits";
+import { requireRole } from "@/lib/auth/require-role";
 
-export default function GymOwnerDashboardPage() {
+export default async function GymOwnerDashboardPage() {
+  // Verify the user's session and gym owner role on the server.
+  await requireRole("gym_owner");
+
   return (
     <>
       <Navbar />
 
       <main className="min-h-screen bg-[#171A18] px-4 py-8 text-[#F4F5F0] sm:px-6 lg:px-8">
         <div className="mx-auto max-w-7xl">
+          {/* Page heading */}
           <div className="mb-8 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#C7F36B]">
@@ -46,12 +51,14 @@ export default function GymOwnerDashboardPage() {
             </Link>
           </div>
 
+          {/* Dashboard layout */}
           <div className="grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
             <div className="hidden lg:block">
               <GymOwnerSidebar />
             </div>
 
             <div className="min-w-0 space-y-6">
+              {/* Gym listing reminder */}
               <div className="flex flex-col gap-3 rounded-2xl border border-[#C7F36B]/20 bg-[#222723] p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
                 <div className="flex items-start gap-3">
                   <div className="rounded-xl bg-[#C7F36B]/10 p-2.5">
@@ -62,6 +69,7 @@ export default function GymOwnerDashboardPage() {
                     <h2 className="font-medium text-white">
                       Complete your gym listing
                     </h2>
+
                     <p className="mt-1 text-sm leading-5 text-white/50">
                       Keep your location, facilities, pricing, and membership
                       information up to date.
@@ -78,13 +86,16 @@ export default function GymOwnerDashboardPage() {
                 </Link>
               </div>
 
+              {/* Statistics */}
               <GymOwnerStats />
 
+              {/* Enquiries and visits */}
               <div className="grid gap-6 2xl:grid-cols-[1.15fr_0.85fr]">
                 <GymEnquiries />
                 <GymVisits />
               </div>
 
+              {/* Quick links and prototype information */}
               <div className="grid gap-4 sm:grid-cols-2">
                 <Link
                   href="/gyms/1"
@@ -115,9 +126,9 @@ export default function GymOwnerDashboardPage() {
                   </h3>
 
                   <p className="mt-2 text-sm leading-6 text-white/50">
-                    All enquiries, visits, statistics, and gym information
-                    are illustrative. Updates are not persisted, and gym
-                    owner authentication is not implemented yet.
+                    Authentication and role checks are connected. Enquiries,
+                    visits, statistics, and gym information are still sample
+                    data and are not persisted to Supabase.
                   </p>
                 </div>
               </div>

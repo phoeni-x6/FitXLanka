@@ -1,3 +1,4 @@
+
 import Link from "next/link";
 import {
   CalendarCheck,
@@ -13,14 +14,19 @@ import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import StatCard from "@/components/dashboard/StatCard";
 import UpcomingBookings from "@/components/dashboard/UpcomingBookings";
 import SavedTrainers from "@/components/dashboard/SavedTrainers";
+import { requireRole } from "@/lib/auth/require-role";
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  // Verify authentication and ensure the user has the client role.
+  await requireRole("client");
+
   return (
     <>
       <Navbar />
 
       <main className="min-h-screen bg-[#171A18] px-4 py-8 text-[#F4F5F0] sm:px-6 lg:px-8">
         <div className="mx-auto max-w-7xl">
+          {/* Page heading */}
           <div className="mb-8">
             <p className="text-sm font-medium text-[#C7F36B]">
               CLIENT WORKSPACE
@@ -36,12 +42,14 @@ export default function DashboardPage() {
             </p>
           </div>
 
+          {/* Dashboard layout */}
           <div className="grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
             <div className="hidden lg:block">
               <DashboardSidebar />
             </div>
 
             <div className="min-w-0 space-y-6">
+              {/* Statistics */}
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 <StatCard
                   label="Total bookings"
@@ -65,6 +73,7 @@ export default function DashboardPage() {
                 />
               </div>
 
+              {/* Explore trainers banner */}
               <div className="rounded-2xl bg-[#C7F36B] p-6 text-[#171A18] sm:p-8">
                 <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
                   <div>
@@ -91,11 +100,13 @@ export default function DashboardPage() {
                 </div>
               </div>
 
+              {/* Bookings and saved trainers */}
               <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
                 <UpcomingBookings />
                 <SavedTrainers />
               </div>
 
+              {/* Quick links */}
               <div className="grid gap-4 sm:grid-cols-2">
                 <Link
                   href="/gyms"
@@ -134,9 +145,10 @@ export default function DashboardPage() {
                 </Link>
               </div>
 
+              {/* Prototype notice */}
               <p className="text-center text-xs text-white/35">
-                Prototype dashboard · All dashboard statistics and bookings
-                are sample data. Sign-in and access control are not connected.
+                Dashboard access is authenticated. Statistics, bookings,
+                and saved trainers are still sample data.
               </p>
             </div>
           </div>
