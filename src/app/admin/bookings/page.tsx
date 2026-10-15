@@ -4,8 +4,11 @@ import { ArrowLeft, CalendarDays } from "lucide-react";
 
 import AdminSidebar from "@/components/admin/AdminSidebar";
 import BookingManagement from "@/components/admin/BookingManagement";
+import { requireRole } from "@/lib/auth/require-role";
 
-export default function AdminBookingsPage() {
+export default async function AdminBookingsPage() {
+  await requireRole("admin");
+
   return (
     <main className="min-h-screen bg-[#171A18] px-4 py-6 text-[#F4F5F0] sm:px-6 lg:px-8">
       <div className="mx-auto max-w-[1600px]">
