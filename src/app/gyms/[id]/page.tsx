@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -14,6 +13,7 @@ import {
 
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
+import GymGallery from "@/components/gyms/GymGallery";
 import { gyms } from "@/data/gyms";
 
 type Props = {
@@ -27,6 +27,9 @@ export default async function GymProfilePage({ params }: Props) {
   if (!gym) {
     notFound();
   }
+
+  const galleryImages =
+    gym.gallery?.length > 0 ? gym.gallery : [gym.image];
 
   return (
     <>
@@ -44,22 +47,11 @@ export default async function GymProfilePage({ params }: Props) {
           </Link>
         </div>
 
-        {/* Hero image */}
-        <section className="mx-auto max-w-7xl px-4 pb-10 pt-6 sm:px-6 lg:px-8">
-          <div className="relative h-[300px] overflow-hidden rounded-3xl border border-white/10 sm:h-[420px]">
-            <Image
-              src={gym.image}
-              alt={gym.name}
-              fill
-              priority
-              sizes="100vw"
-              className="object-cover"
-            />
-
-            <div className="absolute inset-0 bg-gradient-to-t from-[#171A18] via-black/20 to-transparent" />
-
-            <div className="absolute inset-x-0 bottom-0 p-6 sm:p-10">
-              <span className="inline-flex rounded-full border border-white/20 bg-black/40 px-3 py-1.5 text-xs text-white backdrop-blur">
+        {/* Gym heading */}
+        <section className="mx-auto max-w-7xl px-4 pb-6 pt-6 sm:px-6 lg:px-8">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <span className="inline-flex rounded-full border border-[#C7F36B]/20 bg-[#C7F36B]/10 px-3 py-1.5 text-xs font-medium text-[#C7F36B]">
                 {gym.category}
               </span>
 
@@ -67,9 +59,9 @@ export default async function GymProfilePage({ params }: Props) {
                 {gym.name}
               </h1>
 
-              <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-white/75">
+              <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-white/60">
                 <span className="flex items-center gap-2">
-                  <MapPin size={16} />
+                  <MapPin size={16} className="text-[#C7F36B]" />
                   {gym.location}
                 </span>
 
@@ -79,11 +71,31 @@ export default async function GymProfilePage({ params }: Props) {
                     className="fill-[#C7F36B] text-[#C7F36B]"
                   />
                   {gym.rating.toFixed(1)}
-                  <span className="text-white/45">demo rating</span>
+                  <span className="text-white/40">demo rating</span>
                 </span>
               </div>
             </div>
+
+            <div className="shrink-0">
+              <p className="text-xs text-white/40">
+                Monthly membership from
+              </p>
+              <p className="mt-1 text-xl font-semibold text-[#C7F36B]">
+                LKR {gym.priceFrom.toLocaleString("en-LK")}
+                <span className="ml-1 text-sm font-normal text-white/40">
+                  / month
+                </span>
+              </p>
+            </div>
           </div>
+        </section>
+
+        {/* Gym photo gallery */}
+        <section className="mx-auto max-w-7xl px-4 pb-10 sm:px-6 lg:px-8">
+          <GymGallery
+            name={gym.name}
+            images={galleryImages}
+          />
         </section>
 
         {/* Main content */}
@@ -121,7 +133,7 @@ export default async function GymProfilePage({ params }: Props) {
 
                 <div>
                   <h2 className="text-xl font-semibold">
-                    Facilities & features
+                    Facilities &amp; features
                   </h2>
                   <p className="mt-1 text-sm text-white/45">
                     Listed features for this demo profile

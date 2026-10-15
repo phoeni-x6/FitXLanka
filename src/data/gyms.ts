@@ -7,6 +7,7 @@ export type Gym = {
   rating: number;
   priceFrom: number;
   image: string;
+  gallery: string[];
   features: string[];
 };
 
@@ -21,6 +22,12 @@ export const gyms: Gym[] = [
     image:
       "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=1000&q=80",
     features: ["Free Weights", "Personal Training"],
+    gallery: [
+  "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=1200",
+  "https://images.unsplash.com/photo-1534258936925-c58bed479fcb?w=1200",
+  "https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?w=1200",
+  "https://images.unsplash.com/photo-1571902943202-507ec2618e8f?w=1200",
+],
   },
   {
     id: 2,
@@ -32,6 +39,12 @@ export const gyms: Gym[] = [
     image:
       "https://images.unsplash.com/photo-1571902943202-507ec2618e8f?auto=format&fit=crop&w=1000&q=80",
     features: ["Cardio", "Group Classes"],
+    gallery: [
+  "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=1200",
+  "https://images.unsplash.com/photo-1571902943202-507ec2618e8f?w=1200",
+  "https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?w=1200",
+  "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=1200",
+],
   },
   {
     id: 3,
@@ -43,5 +56,12 @@ export const gyms: Gym[] = [
     image:
       "https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?auto=format&fit=crop&w=1000&q=80",
     features: ["Strength Equipment", "Flexible Plans"],
+    gallery: [
+  "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=1200",
+  "https://images.unsplash.com/photo-1571902943202-507ec2618e8f?w=1200",
+  "https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?w=1200",
+  "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=1200",
+],
   },
+  
 ];
