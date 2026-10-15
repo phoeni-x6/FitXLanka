@@ -5,6 +5,7 @@ import {
   BadgeCheck,
   CalendarPlus,
   CircleHelp,
+  UserRound,
 } from "lucide-react";
 
 import Navbar from "@/components/layout/Navbar";
@@ -42,13 +43,23 @@ export default async function TrainerDashboardPage() {
               </p>
             </div>
 
-            <Link
-              href="/trainers"
-              className="inline-flex w-fit items-center gap-2 rounded-xl bg-[#C7F36B] px-4 py-3 text-sm font-semibold text-[#171A18] transition hover:bg-[#d6ff84]"
-            >
-              View marketplace
-              <ArrowUpRight className="h-4 w-4" />
-            </Link>
+            <div className="flex flex-wrap items-center gap-3">
+              <Link
+                href="/trainers/dashboard/profile"
+                className="inline-flex w-fit items-center gap-2 rounded-xl border border-[#C7F36B]/30 bg-[#222723] px-4 py-3 text-sm font-semibold text-[#F4F5F0] transition hover:border-[#C7F36B] hover:bg-[#C7F36B]/10"
+              >
+                <UserRound className="h-4 w-4 text-[#C7F36B]" />
+                View My Profile
+              </Link>
+
+              <Link
+                href="/trainers"
+                className="inline-flex w-fit items-center gap-2 rounded-xl bg-[#C7F36B] px-4 py-3 text-sm font-semibold text-[#171A18] transition hover:bg-[#d6ff84]"
+              >
+                View marketplace
+                <ArrowUpRight className="h-4 w-4" />
+              </Link>
+            </div>
           </div>
 
           {/* Dashboard layout */}
@@ -59,7 +70,7 @@ export default async function TrainerDashboardPage() {
 
             <div className="min-w-0 space-y-6">
               {/* Profile reminder */}
-              <div className="flex flex-col gap-3 rounded-2xl border border-[#C7F36B]/20 bg-[#222723] p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+              <div className="flex flex-col gap-4 rounded-2xl border border-[#C7F36B]/20 bg-[#222723] p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
                 <div className="flex items-start gap-3">
                   <div className="rounded-xl bg-[#C7F36B]/10 p-2.5">
                     <BadgeCheck className="h-5 w-5 text-[#C7F36B]" />
@@ -67,20 +78,21 @@ export default async function TrainerDashboardPage() {
 
                   <div>
                     <h2 className="font-medium text-white">
-                      Build your trainer profile
+                      Manage your trainer profile
                     </h2>
 
-                    <p className="mt-1 text-sm text-white/50">
-                      Keep your specialties, pricing, and availability up to date.
+                    <p className="mt-1 text-sm leading-6 text-white/50">
+                      Update your specialties, pricing, biography, location,
+                      and profile photo.
                     </p>
                   </div>
                 </div>
 
                 <Link
-                  href="/trainers/1"
-                  className="inline-flex w-fit shrink-0 items-center gap-2 text-sm font-medium text-[#C7F36B] hover:underline"
+                  href="/trainers/dashboard/profile"
+                  className="inline-flex w-fit shrink-0 items-center gap-2 rounded-xl bg-[#C7F36B] px-4 py-2.5 text-sm font-semibold text-[#171A18] transition hover:bg-[#d6ff84]"
                 >
-                  Preview profile
+                  View My Profile
                   <ArrowUpRight className="h-4 w-4" />
                 </Link>
               </div>

@@ -154,7 +154,7 @@ export default function TrainerApprovals() {
   ) {
     const confirmation =
       nextStatus === "approved"
-        ? `Approve ${application.full_name} as a trainer?`
+        ? `Approve ${application.full_name} as a trainer? This will activate their trainer role.`
         : `Reject ${application.full_name}'s application?`;
 
     if (!window.confirm(confirmation)) return;
@@ -166,77 +166,51 @@ export default function TrainerApprovals() {
     try {
       const supabase = createClient();
 
-      const {
-        data: { user },
-        error: authError,
-      } = await supabase.auth.getUser();
-
-      if (authError || !user) {
-        setError("Your session has expired. Please sign in again.");
-        return;
-      }
-
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .single();
-
-      if (profileError || profile?.role !== "admin") {
-        setError("Only administrators can review applications.");
-        return;
-      }
-
-      const { data, error: updateError } = await supabase
-        .from("trainer_applications")
-        .update({
-          status: nextStatus,
-          admin_notes: adminNotes.trim() || null,
-          reviewed_by: user.id,
-          reviewed_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", application.id)
-        .eq("status", "pending")
-        .select(
-          "id, user_id, full_name, specialty, bio, location, experience_years, price_per_session, profile_image_url, status, admin_notes, reviewed_by, reviewed_at, created_at"
-        )
-        .maybeSingle();
-
-      if (updateError) {
-        console.error("Application review error:", updateError);
-        setError(
-          "Could not save the decision. Check your administrator permissions and RLS policies."
-        );
-        return;
-      }
-
-      if (!data) {
-        setError(
-          "No application was updated. It may have already been reviewed."
-        );
-        await loadApplications();
-        return;
-      }
-
-      const updatedApplication = data as TrainerApplication;
-
-      setApplications((current) =>
-        current.map((item) =>
-          item.id === updatedApplication.id ? updatedApplication : item
-        )
+      // The database function checks administrator permissions and performs
+      // the application review + role activation in one transaction.
+      const { error: reviewError } = await supabase.rpc(
+        "review_trainer_application",
+        {
+          p_application_id: application.id,
+          p_status: nextStatus,
+          p_admin_notes: adminNotes.trim() || null,
+        }
       );
 
-      setSelected((current) =>
-        current?.id === updatedApplication.id ? updatedApplication : current
-      );
+      if (reviewError) {
+        console.error("Trainer application review error:", reviewError);
 
+        if (
+          reviewError.message.includes("Only administrators") ||
+          reviewError.message.includes("not allowed")
+        ) {
+          setError("Only administrators can review trainer applications.");
+        } else if (
+          reviewError.message.includes("already been reviewed")
+        ) {
+          setError("This application has already been reviewed. Refreshing the list.");
+          await loadApplications();
+        } else {
+          setError(
+            reviewError.message ||
+              "Could not save the decision. Please check the Supabase function and permissions."
+          );
+        }
+
+        return;
+      }
+
+      // Reload the authoritative database state after a successful review.
+      await loadApplications();
+      setSelected(null);
       setAdminNotes("");
       setSuccess(
-        `Application ${nextStatus === "approved" ? "approved" : "rejected"} successfully.`
+        nextStatus === "approved"
+          ? "Trainer approved successfully. Their trainer role is now active."
+          : "Trainer application rejected."
       );
     } catch (err) {
-      console.error("Unexpected review error:", err);
+      console.error("Unexpected trainer review error:", err);
       setError("Something went wrong while reviewing the application.");
     } finally {
       setUpdatingId(null);
