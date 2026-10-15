@@ -6,8 +6,8 @@ export type UserRole = "client" | "trainer" | "gym_owner" | "admin";
 
 const dashboardRoutes: Record<UserRole, string> = {
   client: "/dashboard",
-  trainer: "/trainer/dashboard",
-  gym_owner: "/gym/dashboard",
+  trainer: "/trainers/dashboard",
+  gym_owner: "/gyms/dashboard",
   admin: "/admin/dashboard",
 };
 

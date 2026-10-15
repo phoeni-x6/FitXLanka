@@ -1,692 +1,573 @@
 
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Search,
-  SlidersHorizontal,
-  Eye,
-  Check,
-  X,
-  Clock3,
-  Users,
-  BadgeCheck,
-  Ban,
-  MapPin,
-  Mail,
-  CalendarDays,
-  Dumbbell,
-  ArrowLeft,
-  XCircle,
   CheckCircle2,
-  AlertTriangle,
+  XCircle,
+  Clock,
+  Users,
+  MapPin,
+  CalendarDays,
+  DollarSign,
+  LoaderCircle,
+  RefreshCw,
+  X,
 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
-type ApplicationStatus = "Pending" | "Approved" | "Rejected";
+type ApplicationStatus = "pending" | "approved" | "rejected";
 
 type TrainerApplication = {
-  id: number;
-  name: string;
-  email: string;
+  id: string;
+  user_id: string;
+  full_name: string;
   specialty: string;
+  bio: string | null;
   location: string;
-  experience: number;
-  price: number;
-  submittedAt: string;
+  experience_years: number;
+  price_per_session: number;
+  profile_image_url: string | null;
   status: ApplicationStatus;
-  bio: string;
+  admin_notes: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  created_at: string;
 };
 
-const initialApplications: TrainerApplication[] = [
-  {
-    id: 1,
-    name: "Kasun Perera",
-    email: "kasun.demo@example.com",
-    specialty: "Strength & Muscle Building",
-    location: "Colombo",
-    experience: 5,
-    price: 3500,
-    submittedAt: "12 Oct 2026",
-    status: "Pending",
-    bio: "Focuses on strength development, progressive overload, and structured muscle-building programmes for different experience levels.",
-  },
-  {
-    id: 2,
-    name: "Nethmi Silva",
-    email: "nethmi.demo@example.com",
-    specialty: "Weight Loss & Fitness",
-    location: "Nugegoda",
-    experience: 4,
-    price: 3000,
-    submittedAt: "11 Oct 2026",
-    status: "Pending",
-    bio: "Specialises in sustainable fitness routines, weight management, and building long-term exercise habits.",
-  },
-  {
-    id: 3,
-    name: "Amal Fernando",
-    email: "amal.demo@example.com",
-    specialty: "Bodybuilding & Conditioning",
-    location: "Dehiwala",
-    experience: 7,
-    price: 4000,
-    submittedAt: "10 Oct 2026",
-    status: "Approved",
-    bio: "Works with clients on bodybuilding fundamentals, conditioning, and structured training plans.",
-  },
-  {
-    id: 4,
-    name: "Dinithi Jayawardena",
-    email: "dinithi.demo@example.com",
-    specialty: "Functional Training",
-    location: "Maharagama",
-    experience: 3,
-    price: 2500,
-    submittedAt: "09 Oct 2026",
-    status: "Pending",
-    bio: "Focuses on functional movement, mobility, and general fitness for everyday activities.",
-  },
-  {
-    id: 5,
-    name: "Ravindu Perera",
-    email: "ravindu.demo@example.com",
-    specialty: "Personal Training",
-    location: "Kotte",
-    experience: 2,
-    price: 2000,
-    submittedAt: "08 Oct 2026",
-    status: "Rejected",
-    bio: "Provides general personal training and beginner-friendly workout guidance.",
-  },
-  {
-    id: 6,
-    name: "Tharushi Silva",
-    email: "tharushi.demo@example.com",
-    specialty: "Strength & Conditioning",
-    location: "Rajagiriya",
-    experience: 6,
-    price: 3500,
-    submittedAt: "07 Oct 2026",
-    status: "Approved",
-    bio: "Focuses on strength training, conditioning, and goal-oriented workout programmes.",
-  },
-];
+const statusStyles: Record<ApplicationStatus, string> = {
+  pending: "border-amber-400/20 bg-amber-400/10 text-amber-300",
+  approved: "border-[#C7F36B]/20 bg-[#C7F36B]/10 text-[#C7F36B]",
+  rejected: "border-red-400/20 bg-red-400/10 text-red-300",
+};
 
-const statusOptions = [
-  "All",
-  "Pending",
-  "Approved",
-  "Rejected",
-] as const;
+function formatDate(value: string) {
+  return new Date(value).toLocaleDateString("en-LK", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
 
-type StatusFilter = (typeof statusOptions)[number];
+function formatPrice(value: number) {
+  return `LKR ${Number(value).toLocaleString("en-LK")}`;
+}
 
 export default function TrainerApprovals() {
-  const [applications, setApplications] = useState(initialApplications);
+  const [applications, setApplications] = useState<TrainerApplication[]>([]);
+  const [selected, setSelected] = useState<TrainerApplication | null>(null);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] =
-    useState<StatusFilter>("All");
-  const [selected, setSelected] =
-    useState<TrainerApplication | null>(null);
-  const [confirmation, setConfirmation] = useState<{
-    application: TrainerApplication;
-    status: "Approved" | "Rejected";
-  } | null>(null);
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [loading, setLoading] = useState(true);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [adminNotes, setAdminNotes] = useState("");
 
-  const stats = useMemo(
-    () => [
-      {
-        label: "Total applications",
-        value: applications.length,
-        icon: Users,
-        color: "text-sky-400",
-        bg: "bg-sky-400/10",
-      },
-      {
-        label: "Pending review",
-        value: applications.filter((item) => item.status === "Pending").length,
-        icon: Clock3,
-        color: "text-amber-300",
-        bg: "bg-amber-400/10",
-      },
-      {
-        label: "Approved",
-        value: applications.filter((item) => item.status === "Approved").length,
-        icon: BadgeCheck,
-        color: "text-[#C7F36B]",
-        bg: "bg-[#C7F36B]/10",
-      },
-      {
-        label: "Rejected",
-        value: applications.filter((item) => item.status === "Rejected").length,
-        icon: Ban,
-        color: "text-red-300",
-        bg: "bg-red-400/10",
-      },
-    ],
-    [applications]
-  );
+  const loadApplications = useCallback(async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const supabase = createClient();
+
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
+
+      if (authError || !user) {
+        setError("Please sign in again to view trainer applications.");
+        return;
+      }
+
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single();
+
+      if (profileError || profile?.role !== "admin") {
+        setError("You must be an administrator to view these applications.");
+        return;
+      }
+
+      const { data, error: queryError } = await supabase
+        .from("trainer_applications")
+        .select(
+          "id, user_id, full_name, specialty, bio, location, experience_years, price_per_session, profile_image_url, status, admin_notes, reviewed_by, reviewed_at, created_at"
+        )
+        .order("created_at", { ascending: false });
+
+      if (queryError) {
+        console.error("Trainer applications query error:", queryError);
+        setError(
+          "Could not load applications. Check your Supabase table permissions and RLS policies."
+        );
+        return;
+      }
+
+      setApplications((data ?? []) as TrainerApplication[]);
+    } catch (err) {
+      console.error("Unexpected applications error:", err);
+      setError("Something went wrong while loading applications.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadApplications();
+  }, [loadApplications]);
 
   const filteredApplications = useMemo(() => {
-    const term = search.trim().toLowerCase();
+    const query = search.trim().toLowerCase();
 
     return applications.filter((application) => {
       const matchesSearch =
-        !term ||
-        application.name.toLowerCase().includes(term) ||
-        application.email.toLowerCase().includes(term) ||
-        application.specialty.toLowerCase().includes(term) ||
-        application.location.toLowerCase().includes(term);
+        !query ||
+        application.full_name.toLowerCase().includes(query) ||
+        application.specialty.toLowerCase().includes(query) ||
+        application.location.toLowerCase().includes(query);
 
       const matchesStatus =
-        statusFilter === "All" ||
-        application.status === statusFilter;
+        statusFilter === "all" || application.status === statusFilter;
 
       return matchesSearch && matchesStatus;
     });
   }, [applications, search, statusFilter]);
 
-  function requestStatusChange(
+  const stats = useMemo(
+    () => ({
+      total: applications.length,
+      pending: applications.filter((item) => item.status === "pending").length,
+      approved: applications.filter((item) => item.status === "approved").length,
+      rejected: applications.filter((item) => item.status === "rejected").length,
+    }),
+    [applications]
+  );
+
+  async function reviewApplication(
     application: TrainerApplication,
-    status: "Approved" | "Rejected"
+    nextStatus: "approved" | "rejected"
   ) {
-    setConfirmation({ application, status });
+    const confirmation =
+      nextStatus === "approved"
+        ? `Approve ${application.full_name} as a trainer?`
+        : `Reject ${application.full_name}'s application?`;
+
+    if (!window.confirm(confirmation)) return;
+
+    setUpdatingId(application.id);
+    setError("");
+    setSuccess("");
+
+    try {
+      const supabase = createClient();
+
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
+
+      if (authError || !user) {
+        setError("Your session has expired. Please sign in again.");
+        return;
+      }
+
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single();
+
+      if (profileError || profile?.role !== "admin") {
+        setError("Only administrators can review applications.");
+        return;
+      }
+
+      const { data, error: updateError } = await supabase
+        .from("trainer_applications")
+        .update({
+          status: nextStatus,
+          admin_notes: adminNotes.trim() || null,
+          reviewed_by: user.id,
+          reviewed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", application.id)
+        .eq("status", "pending")
+        .select(
+          "id, user_id, full_name, specialty, bio, location, experience_years, price_per_session, profile_image_url, status, admin_notes, reviewed_by, reviewed_at, created_at"
+        )
+        .maybeSingle();
+
+      if (updateError) {
+        console.error("Application review error:", updateError);
+        setError(
+          "Could not save the decision. Check your administrator permissions and RLS policies."
+        );
+        return;
+      }
+
+      if (!data) {
+        setError(
+          "No application was updated. It may have already been reviewed."
+        );
+        await loadApplications();
+        return;
+      }
+
+      const updatedApplication = data as TrainerApplication;
+
+      setApplications((current) =>
+        current.map((item) =>
+          item.id === updatedApplication.id ? updatedApplication : item
+        )
+      );
+
+      setSelected((current) =>
+        current?.id === updatedApplication.id ? updatedApplication : current
+      );
+
+      setAdminNotes("");
+      setSuccess(
+        `Application ${nextStatus === "approved" ? "approved" : "rejected"} successfully.`
+      );
+    } catch (err) {
+      console.error("Unexpected review error:", err);
+      setError("Something went wrong while reviewing the application.");
+    } finally {
+      setUpdatingId(null);
+    }
   }
-
-  function confirmStatusChange() {
-    if (!confirmation) return;
-
-    const { application, status } = confirmation;
-
-    setApplications((current) =>
-      current.map((item) =>
-        item.id === application.id
-          ? { ...item, status }
-          : item
-      )
-    );
-
-    setSelected((current) =>
-      current?.id === application.id
-        ? { ...current, status }
-        : current
-    );
-
-    setConfirmation(null);
-  }
-
-  const statusStyles: Record<ApplicationStatus, string> = {
-    Pending: "border-amber-400/20 bg-amber-400/10 text-amber-300",
-    Approved: "border-[#C7F36B]/20 bg-[#C7F36B]/10 text-[#C7F36B]",
-    Rejected: "border-red-400/20 bg-red-400/10 text-red-300",
-  };
 
   return (
-    <div className="space-y-6">
-      {/* Statistics */}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {stats.map((stat) => {
+    <div className="space-y-6 text-[#F4F5F0]">
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 className="text-2xl font-semibold">Trainer Applications</h1>
+          <p className="mt-1 text-sm text-white/50">
+            Review applications submitted by fitness professionals.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => void loadApplications()}
+          disabled={loading}
+          className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-[#222723] px-4 py-3 text-sm hover:border-[#C7F36B]/40 disabled:opacity-50"
+        >
+          <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+          Refresh
+        </button>
+      </div>
+
+      {error && (
+        <div
+          role="alert"
+          className="rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-300"
+        >
+          {error}
+        </div>
+      )}
+
+      {success && (
+        <div
+          role="status"
+          className="rounded-xl border border-[#C7F36B]/20 bg-[#C7F36B]/10 p-4 text-sm text-[#C7F36B]"
+        >
+          {success}
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        {[
+          { label: "Total applications", value: stats.total, icon: Users },
+          { label: "Pending review", value: stats.pending, icon: Clock },
+          { label: "Approved", value: stats.approved, icon: CheckCircle2 },
+          { label: "Rejected", value: stats.rejected, icon: XCircle },
+        ].map((stat) => {
           const Icon = stat.icon;
 
           return (
             <div
               key={stat.label}
-              className="rounded-2xl border border-white/10 bg-[#222723] p-5"
+              className="rounded-2xl border border-white/10 bg-[#222723] p-4 sm:p-5"
             >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm text-white/50">
-                    {stat.label}
-                  </p>
-                  <p className="mt-3 text-3xl font-bold text-white">
-                    {stat.value.toString().padStart(2, "0")}
-                  </p>
-                </div>
-
-                <div className={`rounded-xl p-3 ${stat.bg}`}>
-                  <Icon className={`h-5 w-5 ${stat.color}`} />
-                </div>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs text-white/50 sm:text-sm">
+                  {stat.label}
+                </p>
+                <Icon size={18} className="shrink-0 text-[#C7F36B]" />
               </div>
-              <p className="mt-3 text-xs text-white/35">
-                Demo application data
-              </p>
+              <p className="mt-3 text-2xl font-semibold">{stat.value}</p>
             </div>
           );
         })}
       </div>
 
-      {/* Applications table */}
-      <section className="overflow-hidden rounded-2xl border border-white/10 bg-[#222723]">
-        <div className="border-b border-white/10 p-5 sm:p-6">
-          <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
-            <div>
-              <h2 className="text-lg font-semibold text-white">
-                Trainer applications
-              </h2>
-              <p className="mt-1 text-sm text-white/45">
-                Review applications before trainer profiles are published.
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <div className="relative min-w-0 sm:w-72">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" />
-                <input
-                  type="search"
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Search name, email, specialty..."
-                  aria-label="Search trainer applications"
-                  className="w-full rounded-xl border border-white/10 bg-[#171A18] py-3 pl-10 pr-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-[#C7F36B]/50"
-                />
-              </div>
-
-              <div className="relative">
-                <SlidersHorizontal className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
-                <select
-                  value={statusFilter}
-                  onChange={(event) =>
-                    setStatusFilter(event.target.value as StatusFilter)
-                  }
-                  aria-label="Filter by application status"
-                  className="w-full appearance-none rounded-xl border border-white/10 bg-[#171A18] py-3 pl-9 pr-8 text-sm text-white outline-none focus:border-[#C7F36B]/50 sm:w-auto"
-                >
-                  {statusOptions.map((status) => (
-                    <option key={status} value={status}>
-                      {status === "All" ? "All statuses" : status}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-4 flex flex-wrap gap-2">
-            {statusOptions.map((status) => (
-              <button
-                key={status}
-                type="button"
-                onClick={() => setStatusFilter(status)}
-                className={`rounded-lg px-3 py-2 text-xs font-medium transition ${
-                  statusFilter === status
-                    ? "bg-[#C7F36B] text-[#171A18]"
-                    : "border border-white/10 text-white/55 hover:bg-white/5"
-                }`}
-              >
-                {status}
-                {status !== "All" && (
-                  <span className="ml-2 opacity-70">
-                    {
-                      applications.filter(
-                        (item) => item.status === status
-                      ).length
-                    }
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <div className="relative flex-1">
+          <Search
+            size={17}
+            className="absolute left-4 top-1/2 -translate-y-1/2 text-white/35"
+          />
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search name, specialty or location..."
+            className="w-full rounded-xl border border-white/10 bg-[#222723] py-3 pl-11 pr-4 text-sm outline-none focus:border-[#C7F36B]"
+          />
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[850px] text-left">
-            <thead>
-              <tr className="border-b border-white/10 bg-[#171A18]/60">
-                <th className="px-5 py-4 text-xs font-semibold uppercase tracking-wider text-white/40">
-                  Trainer
-                </th>
-                <th className="px-5 py-4 text-xs font-semibold uppercase tracking-wider text-white/40">
-                  Specialty
-                </th>
-                <th className="px-5 py-4 text-xs font-semibold uppercase tracking-wider text-white/40">
-                  Submitted
-                </th>
-                <th className="px-5 py-4 text-xs font-semibold uppercase tracking-wider text-white/40">
-                  Status
-                </th>
-                <th className="px-5 py-4 text-right text-xs font-semibold uppercase tracking-wider text-white/40">
-                  Actions
-                </th>
-              </tr>
-            </thead>
+        <select
+          value={statusFilter}
+          onChange={(event) => setStatusFilter(event.target.value)}
+          className="rounded-xl border border-white/10 bg-[#222723] px-4 py-3 text-sm outline-none focus:border-[#C7F36B]"
+        >
+          <option value="all">All statuses</option>
+          <option value="pending">Pending</option>
+          <option value="approved">Approved</option>
+          <option value="rejected">Rejected</option>
+        </select>
+      </div>
 
-            <tbody className="divide-y divide-white/5">
-              {filteredApplications.map((application) => (
-                <tr
-                  key={application.id}
-                  className="transition hover:bg-white/[0.02]"
-                >
-                  <td className="px-5 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#C7F36B]/10 text-sm font-bold text-[#C7F36B]">
-                        {application.name
-                          .split(" ")
-                          .map((part) => part[0])
-                          .slice(0, 2)
-                          .join("")}
-                      </div>
-                      <div>
-                        <p className="font-medium text-white">
-                          {application.name}
-                        </p>
-                        <p className="mt-1 text-xs text-white/40">
-                          {application.email}
-                        </p>
-                      </div>
-                    </div>
-                  </td>
+      <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#222723]">
+        {loading ? (
+          <div className="flex flex-col items-center justify-center gap-3 p-12 text-white/50">
+            <LoaderCircle size={28} className="animate-spin text-[#C7F36B]" />
+            <p className="text-sm">Loading applications...</p>
+          </div>
+        ) : filteredApplications.length === 0 ? (
+          <div className="flex flex-col items-center justify-center p-10 text-center sm:p-14">
+            <Users size={34} className="text-white/25" />
+            <h3 className="mt-4 font-semibold">No applications found</h3>
+            <p className="mt-2 max-w-sm text-sm leading-6 text-white/45">
+              {applications.length === 0
+                ? "No trainer applications have been submitted yet. Submit an application through the trainer application form to see it here."
+                : "No applications match your current search or status filter."}
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[760px] text-left text-sm">
+              <thead className="border-b border-white/10 bg-[#171A18]/60 text-xs uppercase tracking-wide text-white/45">
+                <tr>
+                  <th className="px-5 py-4 font-medium">Trainer</th>
+                  <th className="px-5 py-4 font-medium">Location</th>
+                  <th className="px-5 py-4 font-medium">Experience</th>
+                  <th className="px-5 py-4 font-medium">Session price</th>
+                  <th className="px-5 py-4 font-medium">Status</th>
+                  <th className="px-5 py-4 font-medium">Submitted</th>
+                  <th className="px-5 py-4 font-medium">Action</th>
+                </tr>
+              </thead>
 
-                  <td className="px-5 py-4">
-                    <p className="text-sm text-white/75">
-                      {application.specialty}
-                    </p>
-                    <p className="mt-1 text-xs text-white/40">
-                      {application.location}
-                    </p>
-                  </td>
+              <tbody className="divide-y divide-white/5">
+                {filteredApplications.map((application) => (
+                  <tr key={application.id} className="hover:bg-white/[0.02]">
+                    <td className="px-5 py-4">
+                      <p className="font-medium">{application.full_name}</p>
+                      <p className="mt-1 text-xs text-white/45">
+                        {application.specialty}
+                      </p>
+                    </td>
 
-                  <td className="px-5 py-4 text-sm text-white/55">
-                    {application.submittedAt}
-                  </td>
+                    <td className="px-5 py-4 text-white/65">
+                      <span className="inline-flex items-center gap-2">
+                        <MapPin size={14} />
+                        {application.location}
+                      </span>
+                    </td>
 
-                  <td className="px-5 py-4">
-                    <span
-                      className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${statusStyles[application.status]}`}
-                    >
-                      {application.status}
-                    </span>
-                  </td>
+                    <td className="px-5 py-4 text-white/65">
+                      {application.experience_years} years
+                    </td>
 
-                  <td className="px-5 py-4">
-                    <div className="flex items-center justify-end gap-2">
+                    <td className="px-5 py-4 text-white/65">
+                      {formatPrice(Number(application.price_per_session))}
+                    </td>
+
+                    <td className="px-5 py-4">
+                      <span
+                        className={`inline-flex rounded-full border px-2.5 py-1 text-xs capitalize ${statusStyles[application.status]}`}
+                      >
+                        {application.status}
+                      </span>
+                    </td>
+
+                    <td className="px-5 py-4 text-white/55">
+                      {formatDate(application.created_at)}
+                    </td>
+
+                    <td className="px-5 py-4">
                       <button
                         type="button"
-                        onClick={() => setSelected(application)}
-                        aria-label={`View ${application.name}'s application`}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-2 text-xs font-medium text-white/70 transition hover:border-white/20 hover:text-white"
+                        onClick={() => {
+                          setSelected(application);
+                          setAdminNotes(application.admin_notes ?? "");
+                          setError("");
+                          setSuccess("");
+                        }}
+                        className="rounded-lg border border-white/10 px-3 py-2 text-xs font-medium hover:border-[#C7F36B]/40 hover:text-[#C7F36B]"
                       >
-                        <Eye size={14} />
-                        View
+                        View details
                       </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
-                      {application.status === "Pending" && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              requestStatusChange(application, "Approved")
-                            }
-                            aria-label={`Approve ${application.name}`}
-                            className="rounded-lg bg-[#C7F36B] p-2 text-[#171A18] transition hover:bg-[#d6ff84]"
-                          >
-                            <Check size={16} />
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() =>
-                              requestStatusChange(application, "Rejected")
-                            }
-                            aria-label={`Reject ${application.name}`}
-                            className="rounded-lg border border-red-400/20 p-2 text-red-300 transition hover:bg-red-400/10"
-                          >
-                            <X size={16} />
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-
-              {filteredApplications.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-5 py-14 text-center">
-                    <Search className="mx-auto h-8 w-8 text-white/20" />
-                    <p className="mt-3 text-sm font-medium text-white/65">
-                      No applications found
-                    </p>
-                    <p className="mt-1 text-xs text-white/35">
-                      Try a different search term or status filter.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSearch("");
-                        setStatusFilter("All");
-                      }}
-                      className="mt-4 text-xs font-semibold text-[#C7F36B] hover:underline"
-                    >
-                      Clear filters
-                    </button>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="flex flex-col gap-2 border-t border-white/10 px-5 py-4 text-xs text-white/35 sm:flex-row sm:items-center sm:justify-between">
-          <p>
-            Showing {filteredApplications.length} of {applications.length} applications
-          </p>
-          <p>Sample data · Changes are not saved</p>
-        </div>
-      </section>
-
-      {/* Application details modal */}
       {selected && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/75 p-4 backdrop-blur-sm"
-          onClick={() => setSelected(null)}
-        >
-          <section
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/70 p-4">
+          <div
             role="dialog"
             aria-modal="true"
-            aria-labelledby="trainer-details-title"
-            className="my-auto max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-white/10 bg-[#222723] shadow-2xl"
-            onClick={(event) => event.stopPropagation()}
+            aria-labelledby="application-title"
+            className="my-auto w-full max-w-2xl rounded-2xl border border-white/10 bg-[#222723] p-5 sm:p-7"
           >
-            <div className="flex items-start justify-between gap-4 border-b border-white/10 p-5 sm:p-6">
+            <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#C7F36B]">
-                  Application details
+                <p className="text-xs font-medium uppercase tracking-wider text-[#C7F36B]">
+                  Trainer application
                 </p>
                 <h2
-                  id="trainer-details-title"
-                  className="mt-2 text-xl font-bold text-white"
+                  id="application-title"
+                  className="mt-2 text-xl font-semibold"
                 >
-                  {selected.name}
+                  {selected.full_name}
                 </h2>
-                <p className="mt-1 text-sm text-white/45">
-                  Trainer application #{selected.id.toString().padStart(4, "0")}
+                <p className="mt-1 text-sm text-white/50">
+                  {selected.specialty}
                 </p>
               </div>
 
               <button
                 type="button"
-                onClick={() => setSelected(null)}
                 aria-label="Close application details"
-                className="rounded-lg p-2 text-white/50 transition hover:bg-white/5 hover:text-white"
+                onClick={() => setSelected(null)}
+                className="rounded-lg p-2 text-white/50 hover:bg-white/5 hover:text-white"
               >
                 <X size={20} />
               </button>
             </div>
 
-            <div className="space-y-6 p-5 sm:p-6">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <span
-                  className={`inline-flex rounded-full border px-3 py-1.5 text-xs font-medium ${statusStyles[selected.status]}`}
-                >
-                  {selected.status}
-                </span>
-
-                <span className="text-xs text-white/40">
-                  Submitted {selected.submittedAt}
-                </span>
+            <div className="mt-6 grid gap-4 sm:grid-cols-2">
+              <div className="rounded-xl bg-[#171A18] p-4">
+                <MapPin size={17} className="text-[#C7F36B]" />
+                <p className="mt-2 text-xs text-white/45">Location</p>
+                <p className="mt-1 text-sm">{selected.location}</p>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="rounded-xl border border-white/10 bg-[#171A18] p-4">
-                  <Mail className="h-4 w-4 text-[#C7F36B]" />
-                  <p className="mt-3 text-xs text-white/40">Email</p>
-                  <p className="mt-1 break-all text-sm text-white">
-                    {selected.email}
-                  </p>
-                </div>
-
-                <div className="rounded-xl border border-white/10 bg-[#171A18] p-4">
-                  <MapPin className="h-4 w-4 text-[#C7F36B]" />
-                  <p className="mt-3 text-xs text-white/40">Location</p>
-                  <p className="mt-1 text-sm text-white">
-                    {selected.location}, Sri Lanka
-                  </p>
-                </div>
-
-                <div className="rounded-xl border border-white/10 bg-[#171A18] p-4">
-                  <Dumbbell className="h-4 w-4 text-[#C7F36B]" />
-                  <p className="mt-3 text-xs text-white/40">Specialty</p>
-                  <p className="mt-1 text-sm text-white">
-                    {selected.specialty}
-                  </p>
-                </div>
-
-                <div className="rounded-xl border border-white/10 bg-[#171A18] p-4">
-                  <CalendarDays className="h-4 w-4 text-[#C7F36B]" />
-                  <p className="mt-3 text-xs text-white/40">Experience</p>
-                  <p className="mt-1 text-sm text-white">
-                    {selected.experience} years
-                  </p>
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-sm font-semibold text-white">
-                  About the trainer
-                </h3>
-                <p className="mt-2 text-sm leading-6 text-white/55">
-                  {selected.bio}
+              <div className="rounded-xl bg-[#171A18] p-4">
+                <CalendarDays size={17} className="text-[#C7F36B]" />
+                <p className="mt-2 text-xs text-white/45">Experience</p>
+                <p className="mt-1 text-sm">
+                  {selected.experience_years} years
                 </p>
               </div>
 
-              <div className="rounded-xl border border-white/10 bg-[#171A18] p-4">
-                <p className="text-xs text-white/40">
-                  Listed session price
+              <div className="rounded-xl bg-[#171A18] p-4 sm:col-span-2">
+                <DollarSign size={17} className="text-[#C7F36B]" />
+                <p className="mt-2 text-xs text-white/45">
+                  Price per session
                 </p>
-                <p className="mt-1 text-xl font-bold text-[#C7F36B]">
-                  LKR {selected.price.toLocaleString("en-LK")}
-                  <span className="ml-1 text-xs font-normal text-white/40">
-                    / session
-                  </span>
+                <p className="mt-1 text-sm">
+                  {formatPrice(Number(selected.price_per_session))}
                 </p>
               </div>
+            </div>
 
-              {selected.status === "Pending" ? (
-                <div className="flex flex-col gap-3 border-t border-white/10 pt-5 sm:flex-row">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      requestStatusChange(selected, "Approved")
-                    }
-                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#C7F36B] px-4 py-3 text-sm font-bold text-[#171A18] transition hover:bg-[#d6ff84]"
-                  >
-                    <CheckCircle2 size={17} />
-                    Approve trainer
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      requestStatusChange(selected, "Rejected")
-                    }
-                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-red-400/20 px-4 py-3 text-sm font-semibold text-red-300 transition hover:bg-red-400/10"
-                  >
-                    <XCircle size={17} />
-                    Reject application
-                  </button>
-                </div>
-              ) : (
-                <div className="border-t border-white/10 pt-5">
-                  <p className="text-sm text-white/45">
-                    This application is already {selected.status.toLowerCase()}.
-                    Only pending applications can be reviewed here.
-                  </p>
-                </div>
-              )}
-
-              <p className="text-xs leading-5 text-amber-200/60">
-                Demo profile only. Verify identity, qualifications, and any
-                required credentials before approving real trainer listings.
+            <div className="mt-5">
+              <h3 className="text-sm font-medium">Professional biography</h3>
+              <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-white/60">
+                {selected.bio?.trim() || "No biography provided."}
               </p>
             </div>
-          </section>
-        </div>
-      )}
 
-      {/* Status confirmation modal */}
-      {confirmation && (
-        <div
-          className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
-          onClick={() => setConfirmation(null)}
-        >
-          <section
-            role="alertdialog"
-            aria-modal="true"
-            aria-labelledby="confirmation-title"
-            className="w-full max-w-md rounded-2xl border border-white/10 bg-[#222723] p-6 shadow-2xl"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div
-              className={`flex h-12 w-12 items-center justify-center rounded-xl ${
-                confirmation.status === "Approved"
-                  ? "bg-[#C7F36B]/10 text-[#C7F36B]"
-                  : "bg-red-400/10 text-red-300"
-              }`}
-            >
-              {confirmation.status === "Approved" ? (
-                <CheckCircle2 size={23} />
+            <div className="mt-5">
+              <label
+                htmlFor="adminNotes"
+                className="text-sm font-medium"
+              >
+                Admin notes
+              </label>
+              <textarea
+                id="adminNotes"
+                value={adminNotes}
+                onChange={(event) => setAdminNotes(event.target.value)}
+                maxLength={2000}
+                rows={3}
+                placeholder="Optional review notes..."
+                disabled={selected.status !== "pending" || updatingId !== null}
+                className="mt-2 w-full resize-y rounded-xl border border-white/10 bg-[#171A18] p-3 text-sm outline-none focus:border-[#C7F36B] disabled:opacity-60"
+              />
+            </div>
+
+            <div className="mt-6 flex flex-col-reverse justify-between gap-3 sm:flex-row sm:items-center">
+              <span
+                className={`w-fit rounded-full border px-3 py-1.5 text-xs capitalize ${statusStyles[selected.status]}`}
+              >
+                {selected.status}
+              </span>
+
+              {selected.status === "pending" ? (
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <button
+                    type="button"
+                    disabled={updatingId === selected.id}
+                    onClick={() =>
+                      void reviewApplication(selected, "rejected")
+                    }
+                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-400/20 px-4 py-3 text-sm text-red-300 hover:bg-red-400/10 disabled:opacity-50"
+                  >
+                    {updatingId === selected.id ? (
+                      <LoaderCircle size={16} className="animate-spin" />
+                    ) : (
+                      <XCircle size={16} />
+                    )}
+                    Reject
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={updatingId === selected.id}
+                    onClick={() =>
+                      void reviewApplication(selected, "approved")
+                    }
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#C7F36B] px-4 py-3 text-sm font-semibold text-[#171A18] hover:bg-[#d5fa8b] disabled:opacity-50"
+                  >
+                    {updatingId === selected.id ? (
+                      <LoaderCircle size={16} className="animate-spin" />
+                    ) : (
+                      <CheckCircle2 size={16} />
+                    )}
+                    Approve trainer
+                  </button>
+                </div>
               ) : (
-                <AlertTriangle size={23} />
+                <button
+                  type="button"
+                  onClick={() => setSelected(null)}
+                  className="rounded-xl border border-white/10 px-4 py-3 text-sm hover:bg-white/5"
+                >
+                  Close
+                </button>
               )}
             </div>
 
-            <h2
-              id="confirmation-title"
-              className="mt-4 text-lg font-bold text-white"
-            >
-              {confirmation.status === "Approved"
-                ? "Approve this trainer?"
-                : "Reject this application?"}
-            </h2>
-
-            <p className="mt-2 text-sm leading-6 text-white/55">
-              {confirmation.status === "Approved"
-                ? `${confirmation.application.name} will be marked as approved in this prototype.`
-                : `${confirmation.application.name} will be marked as rejected in this prototype.`}
-            </p>
-
-            <div className="mt-6 flex gap-3">
-              <button
-                type="button"
-                onClick={() => setConfirmation(null)}
-                className="flex-1 rounded-xl border border-white/10 px-4 py-3 text-sm font-semibold text-white/70 transition hover:bg-white/5"
-              >
-                Cancel
-              </button>
-
-              <button
-                type="button"
-                onClick={confirmStatusChange}
-                className={`flex-1 rounded-xl px-4 py-3 text-sm font-bold transition ${
-                  confirmation.status === "Approved"
-                    ? "bg-[#C7F36B] text-[#171A18] hover:bg-[#d6ff84]"
-                    : "bg-red-400 text-[#171A18] hover:bg-red-300"
-                }`}
-              >
-                Confirm {confirmation.status.toLowerCase()}
-              </button>
-            </div>
-          </section>
+            {selected.reviewed_at && (
+              <p className="mt-4 text-xs text-white/40">
+                Reviewed on {formatDate(selected.reviewed_at)}
+              </p>
+            )}
+          </div>
         </div>
       )}
     </div>

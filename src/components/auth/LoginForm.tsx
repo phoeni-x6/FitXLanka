@@ -30,8 +30,53 @@ export default function LoginForm() {
   const inputClass =
     "mt-2 w-full rounded-xl border border-white/10 bg-[#171A18] py-3.5 pl-11 pr-4 text-sm text-[#F4F5F0] outline-none transition placeholder:text-white/30 focus:border-[#C7F36B]";
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  const dashboardByRole: Record<string, string> = {
+    client: "/dashboard",
+    trainer: "/trainers/dashboard",
+    gym_owner: "/gyms/dashboard",
+    admin: "/admin/dashboard",
+  };
+
+  async function redirectByRole(userId: string) {
+    const supabase = createClient();
+
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (profileError) {
+      console.error("Profile lookup error:", profileError);
+      setError(
+        "You signed in, but your profile could not be loaded. Please try again."
+      );
+      return;
+    }
+
+    if (!profile) {
+      setError(
+        "Your account profile was not found. Please contact support."
+      );
+      return;
+    }
+
+    const destination = dashboardByRole[profile.role];
+
+    if (!destination) {
+      setError(
+        "Your account has an unrecognized role. Please contact support."
+      );
+      return;
+    }
+
+    router.replace(destination);
+    router.refresh();
+  }
+
+  async function handleGoogleSignIn() {
+    if (loading) return;
+
     setError("");
     setMessage("");
     setLoading(true);
@@ -39,7 +84,51 @@ export default function LoginForm() {
     try {
       const supabase = createClient();
 
+      const { error: googleError } =
+        await supabase.auth.signInWithOAuth({
+          provider: "google",
+          options: {
+            redirectTo: `${window.location.origin}/auth/callback`,
+            queryParams: {
+              prompt: "select_account",
+            },
+          },
+        });
+
+      if (googleError) {
+        console.error("Google sign-in error:", googleError);
+        setError(
+          "Unable to start Google sign-in. Please check your configuration and try again."
+        );
+        setLoading(false);
+      }
+      // On success, Supabase redirects the browser to Google.
+    } catch (err) {
+      console.error("Unexpected Google sign-in error:", err);
+      setError("Something went wrong while connecting to Google.");
+      setLoading(false);
+    }
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (loading) return;
+
+    setError("");
+    setMessage("");
+    setLoading(true);
+
+    try {
+      const supabase = createClient();
+
+      // Password reset
       if (resetMode) {
+        if (!email.trim()) {
+          setError("Please enter your email address.");
+          return;
+        }
+
         const { error: resetError } =
           await supabase.auth.resetPasswordForEmail(
             email.trim().toLowerCase(),
@@ -49,7 +138,10 @@ export default function LoginForm() {
           );
 
         if (resetError) {
-          setError(resetError.message);
+          console.error("Password reset error:", resetError);
+          setError(
+            "Unable to send the reset link. Please try again later."
+          );
           return;
         }
 
@@ -60,34 +152,42 @@ export default function LoginForm() {
         return;
       }
 
-      const { error: signInError } =
+      // Email and password sign-in
+      const { data, error: signInError } =
         await supabase.auth.signInWithPassword({
           email: email.trim().toLowerCase(),
           password,
         });
 
       if (signInError) {
+        console.error("Supabase sign-in error:", signInError);
+
         if (
           signInError.message.toLowerCase().includes("email not confirmed")
         ) {
           setError(
-            "Please confirm your email address before signing in. Check your inbox for the confirmation link."
+            "Please confirm your email address before signing in. Check your inbox."
           );
         } else {
-          setError("Unable to sign in with those credentials. Check your email and password.");
+          setError(
+            "Unable to sign in with those credentials. Check your email and password."
+          );
         }
+
         return;
       }
 
-      // A successful sign-in establishes a Supabase session.
-      // The destination is temporary until server-side role redirects
-      // are implemented in the next step.
-      router.replace("/dashboard");
-      router.refresh();
-    } catch {
-      setError(
-        "Unable to connect to the authentication service. Please try again."
-      );
+      if (!data.user || !data.session) {
+        setError(
+          "Your login session could not be created. Please try again."
+        );
+        return;
+      }
+
+      await redirectByRole(data.user.id);
+    } catch (err) {
+      console.error("Unexpected login error:", err);
+      setError("Something went wrong while signing in. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -101,9 +201,8 @@ export default function LoginForm() {
         </div>
 
         <h2 className="mt-5 text-2xl font-semibold">Check your email</h2>
-        <p className="mt-3 text-sm leading-6 text-white/55">
-          {message}
-        </p>
+
+        <p className="mt-3 text-sm leading-6 text-white/55">{message}</p>
 
         <button
           type="button"
@@ -143,33 +242,38 @@ export default function LoginForm() {
         <>
           <button
             type="button"
-            disabled
-            title="Google sign-in has not been configured yet"
-            className="flex w-full cursor-not-allowed items-center justify-center gap-3 rounded-xl border border-white/10 bg-[#171A18] px-4 py-3.5 text-sm font-medium opacity-50"
+            onClick={handleGoogleSignIn}
+            disabled={loading}
+            className="flex w-full items-center justify-center gap-3 rounded-xl border border-white/10 bg-[#171A18] px-4 py-3.5 text-sm font-medium transition hover:border-white/25 hover:bg-white/[0.03] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <svg
-              viewBox="0 0 48 48"
-              className="h-5 w-5"
-              aria-hidden="true"
-            >
-              <path
-                fill="#EA4335"
-                d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5Z"
-              />
-              <path
-                fill="#4285F4"
-                d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.25 5.48-4.73 7.18l7.26 5.64c4.24-3.91 6.51-9.67 6.51-17.29Z"
-              />
-              <path
-                fill="#FBBC05"
-                d="M10.53 28.59A14.4 14.4 0 0 1 9.75 24c0-1.59.27-3.13.76-4.59l-7.98-6.19A23.93 23.93 0 0 0 0 24c0 3.87.93 7.52 2.56 10.78l7.97-6.19Z"
-              />
-              <path
-                fill="#34A853"
-                d="M24 48c6.48 0 11.93-2.13 15.9-5.79l-7.26-5.64c-2.01 1.35-4.59 2.15-8.64 2.15-6.26 0-11.57-4.22-13.46-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48Z"
-              />
-            </svg>
-            Google sign-in — coming soon
+            {loading ? (
+              <LoaderCircle size={18} className="animate-spin" />
+            ) : (
+              <svg
+                viewBox="0 0 48 48"
+                className="h-5 w-5"
+                aria-hidden="true"
+              >
+                <path
+                  fill="#EA4335"
+                  d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5Z"
+                />
+                <path
+                  fill="#4285F4"
+                  d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.25 5.48-4.73 7.18l7.26 5.64c4.24-3.91 6.51-9.67 6.51-17.29Z"
+                />
+                <path
+                  fill="#FBBC05"
+                  d="M10.53 28.59A14.4 14.4 0 0 1 9.75 24c0-1.59.27-3.13.76-4.59l-7.98-6.19A23.93 23.93 0 0 0 0 24c0 3.87.93 7.52 2.56 10.78l7.97-6.19Z"
+                />
+                <path
+                  fill="#34A853"
+                  d="M24 48c6.48 0 11.93-2.13 15.9-5.79l-7.26-5.64c-2.01 1.35-4.59 2.15-8.64 2.15-6.26 0-11.57-4.22-13.46-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48Z"
+                />
+              </svg>
+            )}
+
+            {loading ? "Connecting to Google..." : "Continue with Google"}
           </button>
 
           <div className="my-6 flex items-center gap-4">
@@ -196,6 +300,7 @@ export default function LoginForm() {
 
             <input
               id="loginEmail"
+              name="email"
               type="email"
               autoComplete="email"
               required
@@ -237,6 +342,7 @@ export default function LoginForm() {
 
               <input
                 id="loginPassword"
+                name="password"
                 type={showPassword ? "text" : "password"}
                 autoComplete="current-password"
                 required
@@ -326,3 +432,4 @@ export default function LoginForm() {
     </div>
   );
 }
+  
