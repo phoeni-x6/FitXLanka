@@ -3,6 +3,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Menu,
   X,
@@ -11,6 +12,8 @@ import {
   LayoutDashboard,
   ChevronDown,
   Settings2,
+  LogOut,
+  Building2,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
@@ -24,13 +27,18 @@ const links = [
 ];
 
 export default function Navbar() {
+  const router = useRouter();
+
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [hasTrainerApplication, setHasTrainerApplication] = useState(false);
+  const [hasGymApplication, setHasGymApplication] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const isTrainer = userRole === "trainer";
+  const isGymOwner = userRole === "gym_owner";
 
   const checkUserStatus = useCallback(async () => {
     const supabase = createClient();
@@ -44,13 +52,15 @@ export default function Navbar() {
       if (authError || !user) {
         setUserRole(null);
         setHasTrainerApplication(false);
+        setHasGymApplication(false);
         setAuthChecked(true);
         return;
       }
 
       const [
         { data: profile, error: profileError },
-        { data: application, error: applicationError },
+        { data: trainerApplication, error: trainerApplicationError },
+        { data: gymApplication, error: gymApplicationError },
       ] = await Promise.all([
         supabase
           .from("profiles")
@@ -63,16 +73,29 @@ export default function Navbar() {
           .select("id, status")
           .eq("user_id", user.id)
           .maybeSingle(),
+
+        supabase
+          .from("gym_applications")
+          .select("id, status")
+          .eq("user_id", user.id)
+          .maybeSingle(),
       ]);
 
       if (profileError) {
         console.error("Unable to check user role:", profileError.message);
       }
 
-      if (applicationError) {
+      if (trainerApplicationError) {
         console.error(
           "Unable to check trainer application:",
-          applicationError.message
+          trainerApplicationError.message
+        );
+      }
+
+      if (gymApplicationError) {
+        console.error(
+          "Unable to check gym application:",
+          gymApplicationError.message
         );
       }
 
@@ -80,11 +103,16 @@ export default function Navbar() {
 
       setUserRole(role);
 
-      // Only show the application link to applicants who are not trainers.
       setHasTrainerApplication(
         role !== "trainer" &&
-          !applicationError &&
-          Boolean(application)
+          !trainerApplicationError &&
+          Boolean(trainerApplication)
+      );
+
+      setHasGymApplication(
+        role !== "gym_owner" &&
+          !gymApplicationError &&
+          Boolean(gymApplication)
       );
 
       setAuthChecked(true);
@@ -92,6 +120,7 @@ export default function Navbar() {
       console.error("Unable to check authentication status:", error);
       setUserRole(null);
       setHasTrainerApplication(false);
+      setHasGymApplication(false);
       setAuthChecked(true);
     }
   }, []);
@@ -100,20 +129,15 @@ export default function Navbar() {
     let active = true;
     const supabase = createClient();
 
-    async function loadStatus() {
-      await checkUserStatus();
-    }
-
-    loadStatus();
+    void checkUserStatus();
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(() => {
       if (active) {
-        // Run the Supabase queries after the auth callback completes.
         setTimeout(() => {
           if (active) {
-            checkUserStatus();
+            void checkUserStatus();
           }
         }, 0);
       }
@@ -130,7 +154,36 @@ export default function Navbar() {
     setProfileMenuOpen(false);
   };
 
-  const applicationLink = (
+  const handleLogout = async () => {
+    if (loggingOut) return;
+
+    setLoggingOut(true);
+
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signOut();
+
+      if (error) {
+        console.error("Logout failed:", error.message);
+        setLoggingOut(false);
+        return;
+      }
+
+      setUserRole(null);
+      setHasTrainerApplication(false);
+      setHasGymApplication(false);
+      setAuthChecked(true);
+      closeMenus();
+
+      router.replace("/");
+      router.refresh();
+    } catch (error) {
+      console.error("An unexpected error occurred during logout:", error);
+      setLoggingOut(false);
+    }
+  };
+
+  const trainerApplicationLink = (
     <Link
       href="/trainers/application-status"
       onClick={closeMenus}
@@ -141,6 +194,24 @@ export default function Navbar() {
     </Link>
   );
 
+  const gymApplicationLink = (
+    <Link
+      href="/gyms/application-status"
+      onClick={closeMenus}
+      className="inline-flex items-center gap-2 rounded-full border border-brand-lime/25 bg-brand-lime/10 px-4 py-2.5 text-sm font-semibold text-brand-lime transition hover:bg-brand-lime/20"
+    >
+      <Building2 className="h-4 w-4 shrink-0" />
+      My Gym Application
+    </Link>
+  );
+
+  const profileIconClass = (open: boolean) =>
+    `flex h-11 w-11 items-center justify-center rounded-full border transition ${
+      open
+        ? "border-brand-lime bg-brand-lime/15 text-brand-lime"
+        : "border-white/10 bg-white/[0.04] text-white hover:border-brand-lime/50 hover:text-brand-lime"
+    }`;
+
   const trainerProfileDropdown = (
     <div className="absolute right-0 top-full z-[60] mt-3 w-64 overflow-hidden rounded-2xl border border-white/10 bg-[#222723] p-2 shadow-2xl shadow-black/40">
       <div className="border-b border-white/10 px-3 py-3">
@@ -148,11 +219,8 @@ export default function Navbar() {
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-lime/10">
             <UserRound className="h-5 w-5 text-brand-lime" />
           </div>
-
           <div>
-            <p className="text-sm font-semibold text-white">
-              Trainer account
-            </p>
+            <p className="text-sm font-semibold text-white">Trainer account</p>
             <p className="mt-0.5 text-xs text-gray-400">
               Manage your coaching profile
             </p>
@@ -178,6 +246,77 @@ export default function Navbar() {
           <Settings2 className="h-4 w-4" />
           <span className="flex-1">My Profile</span>
         </Link>
+      </div>
+
+      <div className="border-t border-white/10 pt-2">
+        <button
+          type="button"
+          onClick={handleLogout}
+          disabled={loggingOut}
+          className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium text-red-400 transition hover:bg-red-500/10 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <LogOut className="h-4 w-4" />
+          {loggingOut ? "Logging out..." : "Log Out"}
+        </button>
+      </div>
+    </div>
+  );
+
+  const gymOwnerProfileDropdown = (
+    <div className="absolute right-0 top-full z-[60] mt-3 w-64 overflow-hidden rounded-2xl border border-white/10 bg-[#222723] p-2 shadow-2xl shadow-black/40">
+      <div className="border-b border-white/10 px-3 py-3">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-lime/10">
+            <Building2 className="h-5 w-5 text-brand-lime" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-white">Gym owner account</p>
+            <p className="mt-0.5 text-xs text-gray-400">
+              Manage your gym listing
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-1 py-2">
+        <Link
+          href="/gyms/dashboard"
+          onClick={closeMenus}
+          className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-gray-200 transition hover:bg-brand-lime/10 hover:text-brand-lime"
+        >
+          <LayoutDashboard className="h-4 w-4" />
+          <span className="flex-1">Gym Dashboard</span>
+        </Link>
+
+        <Link
+          href="/gyms/dashboard/profile"
+          onClick={closeMenus}
+          className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-gray-200 transition hover:bg-brand-lime/10 hover:text-brand-lime"
+        >
+          <Settings2 className="h-4 w-4" />
+          <span className="flex-1">My Gym Profile</span>
+        </Link>
+
+        <Link
+          href="/gyms/application-status"
+          onClick={closeMenus}
+          className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-gray-200 transition hover:bg-brand-lime/10 hover:text-brand-lime"
+        >
+          <FileCheck2 className="h-4 w-4" />
+          <span className="flex-1">Application Details</span>
+        </Link>
+      </div>
+
+      <div className="border-t border-white/10 pt-2">
+        <button
+          type="button"
+          onClick={handleLogout}
+          disabled={loggingOut}
+          className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium text-red-400 transition hover:bg-red-500/10 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <LogOut className="h-4 w-4" />
+          {loggingOut ? "Logging out..." : "Log Out"}
+        </button>
       </div>
     </div>
   );
@@ -217,30 +356,38 @@ export default function Navbar() {
 
         {/* Desktop actions */}
         <div className="hidden items-center gap-3 md:flex">
-          {authChecked && isTrainer ? (
+          {authChecked && (isTrainer || isGymOwner) ? (
             <div className="relative">
               <button
                 type="button"
-                aria-label="Open trainer profile menu"
-                aria-expanded={profileMenuOpen}
-                onClick={() =>
-                  setProfileMenuOpen((open) => !open)
+                aria-label={
+                  isGymOwner
+                    ? "Open gym owner profile menu"
+                    : "Open trainer profile menu"
                 }
-                className={`flex h-11 w-11 items-center justify-center rounded-full border transition ${
-                  profileMenuOpen
-                    ? "border-brand-lime bg-brand-lime/15 text-brand-lime"
-                    : "border-white/10 bg-white/[0.04] text-white hover:border-brand-lime/50 hover:text-brand-lime"
-                }`}
+                aria-expanded={profileMenuOpen}
+                onClick={() => setProfileMenuOpen((open) => !open)}
+                className={profileIconClass(profileMenuOpen)}
               >
-                <UserRound className="h-5 w-5" />
-                <ChevronDown className="ml-0.5 h-3 w-3" />
+                {isGymOwner ? (
+                  <Building2 className="h-5 w-5" />
+                ) : (
+                  <>
+                    <UserRound className="h-5 w-5" />
+                    <ChevronDown className="ml-0.5 h-3 w-3" />
+                  </>
+                )}
               </button>
 
-              {profileMenuOpen && trainerProfileDropdown}
+              {profileMenuOpen &&
+                (isGymOwner
+                  ? gymOwnerProfileDropdown
+                  : trainerProfileDropdown)}
             </div>
           ) : (
             <>
-              {authChecked && hasTrainerApplication && applicationLink}
+              {authChecked && hasTrainerApplication && trainerApplicationLink}
+              {authChecked && hasGymApplication && gymApplicationLink}
 
               <Link
                 href="/login"
@@ -261,25 +408,33 @@ export default function Navbar() {
 
         {/* Mobile actions */}
         <div className="flex items-center gap-2 md:hidden">
-          {authChecked && isTrainer && (
+          {authChecked && (isTrainer || isGymOwner) && (
             <div className="relative">
               <button
                 type="button"
-                aria-label="Open trainer profile menu"
-                aria-expanded={profileMenuOpen}
-                onClick={() =>
-                  setProfileMenuOpen((open) => !open)
+                aria-label={
+                  isGymOwner
+                    ? "Open gym owner profile menu"
+                    : "Open trainer profile menu"
                 }
-                className={`flex h-10 w-10 items-center justify-center rounded-full border transition ${
-                  profileMenuOpen
-                    ? "border-brand-lime bg-brand-lime/15 text-brand-lime"
-                    : "border-white/10 text-white hover:border-brand-lime/50 hover:text-brand-lime"
-                }`}
+                aria-expanded={profileMenuOpen}
+                onClick={() => {
+                  setProfileMenuOpen((open) => !open);
+                  setMenuOpen(false);
+                }}
+                className={profileIconClass(profileMenuOpen)}
               >
-                <UserRound className="h-5 w-5" />
+                {isGymOwner ? (
+                  <Building2 className="h-5 w-5" />
+                ) : (
+                  <UserRound className="h-5 w-5" />
+                )}
               </button>
 
-              {profileMenuOpen && trainerProfileDropdown}
+              {profileMenuOpen &&
+                (isGymOwner
+                  ? gymOwnerProfileDropdown
+                  : trainerProfileDropdown)}
             </div>
           )}
 
@@ -317,39 +472,22 @@ export default function Navbar() {
               </Link>
             ))}
 
-            {authChecked && isTrainer && (
+            {authChecked && !isTrainer && !isGymOwner && (
               <>
-                <div className="my-1 border-t border-white/10" />
+                {hasTrainerApplication && (
+                  <>
+                    <div className="my-1 border-t border-white/10" />
+                    {trainerApplicationLink}
+                  </>
+                )}
 
-                <Link
-                  href="/trainers/dashboard"
-                  onClick={closeMenus}
-                  className="flex items-center gap-3 text-sm text-gray-200 transition hover:text-brand-lime"
-                >
-                  <LayoutDashboard className="h-4 w-4" />
-                  Trainer Dashboard
-                </Link>
+                {hasGymApplication && (
+                  <>
+                    <div className="my-1 border-t border-white/10" />
+                    {gymApplicationLink}
+                  </>
+                )}
 
-                <Link
-                  href="/trainers/dashboard/profile"
-                  onClick={closeMenus}
-                  className="flex items-center gap-3 text-sm text-gray-200 transition hover:text-brand-lime"
-                >
-                  <Settings2 className="h-4 w-4" />
-                  My Profile
-                </Link>
-              </>
-            )}
-
-            {authChecked && !isTrainer && hasTrainerApplication && (
-              <>
-                <div className="my-1 border-t border-white/10" />
-                {applicationLink}
-              </>
-            )}
-
-            {(!authChecked || !isTrainer) && (
-              <>
                 <div className="my-1 border-t border-white/10" />
 
                 <Link
@@ -367,6 +505,55 @@ export default function Navbar() {
                 >
                   Get started
                 </Link>
+              </>
+            )}
+
+            {authChecked && (isTrainer || isGymOwner) && (
+              <>
+                <div className="my-1 border-t border-white/10" />
+
+                <Link
+                  href={isGymOwner ? "/gyms/dashboard" : "/trainers/dashboard"}
+                  onClick={closeMenus}
+                  className="flex items-center gap-3 text-sm text-gray-200 transition hover:text-brand-lime"
+                >
+                  <LayoutDashboard className="h-4 w-4" />
+                  {isGymOwner ? "Gym Dashboard" : "Trainer Dashboard"}
+                </Link>
+
+                <Link
+                  href={
+                    isGymOwner
+                      ? "/gyms/dashboard/profile"
+                      : "/trainers/dashboard/profile"
+                  }
+                  onClick={closeMenus}
+                  className="flex items-center gap-3 text-sm text-gray-200 transition hover:text-brand-lime"
+                >
+                  <Settings2 className="h-4 w-4" />
+                  {isGymOwner ? "My Gym Profile" : "My Profile"}
+                </Link>
+
+                {isGymOwner && (
+                  <Link
+                    href="/gyms/application-status"
+                    onClick={closeMenus}
+                    className="flex items-center gap-3 text-sm text-gray-200 transition hover:text-brand-lime"
+                  >
+                    <FileCheck2 className="h-4 w-4" />
+                    Application Details
+                  </Link>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  disabled={loggingOut}
+                  className="flex items-center gap-3 text-left text-sm font-medium text-red-400 transition hover:text-red-300 disabled:opacity-60"
+                >
+                  <LogOut className="h-4 w-4" />
+                  {loggingOut ? "Logging out..." : "Log Out"}
+                </button>
               </>
             )}
           </div>
