@@ -1,90 +1,150 @@
 
 "use client";
 
-import { useMemo, useState } from "react";
-import { Search, Users, X } from "lucide-react";
-import { trainers } from "@/data/trainers";
-import TrainerFilters, {
-  type TrainerFiltersState,
-} from "./TrainerFilters";
-import TrainerCard from "./TrainerCard";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  AlertCircle,
+  LoaderCircle,
+  Search,
+  Users,
+  X,
+} from "lucide-react";
+
+import { createClient } from "@/lib/supabase/client";
+import TrainerFilters, { type TrainerFiltersState } from "./TrainerFilters";
+import TrainerCard, { type DirectoryTrainer } from "./TrainerCard";
 
 const initialFilters: TrainerFiltersState = {
   location: "",
   specialty: "",
   maxPrice: "",
-  availability: "",
   sort: "recommended",
 };
 
 export default function TrainerDirectory() {
+  const [trainers, setTrainers] = useState<DirectoryTrainer[]>([]);
   const [query, setQuery] = useState("");
   const [filters, setFilters] =
     useState<TrainerFiltersState>(initialFilters);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const fetchTrainers = useCallback(async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const supabase = createClient();
+
+      const { data, error: queryError } = await supabase
+        .from("trainer_profiles")
+        .select(
+          "id, full_name, specialty, bio, location, experience_years, price_per_session, profile_image_url"
+        )
+        .eq("is_published", true)
+        .order("created_at", { ascending: false });
+
+      if (queryError) {
+        throw queryError;
+      }
+
+      const mappedTrainers: DirectoryTrainer[] = (data ?? []).map(
+        (trainer) => ({
+          id: trainer.id,
+          name: trainer.full_name,
+          specialty: trainer.specialty || "Personal Training",
+          description: trainer.bio ?? "",
+          location: trainer.location || "Location not specified",
+          experienceYears: Number(trainer.experience_years ?? 0),
+          price: Number(trainer.price_per_session ?? 0),
+          image: trainer.profile_image_url || null,
+        })
+      );
+
+      setTrainers(mappedTrainers);
+    } catch (err) {
+      console.error("Failed to load trainers:", err);
+      setError(
+        "We couldn't load trainers right now. Please try again."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchTrainers();
+  }, [fetchTrainers]);
 
   const locations = useMemo(
-    () => [...new Set(trainers.map((trainer) => trainer.location))].sort(),
-    []
+    () =>
+      [...new Set(trainers.map((trainer) => trainer.location))]
+        .filter((location) => location !== "Location not specified")
+        .sort(),
+    [trainers]
   );
 
   const specialties = useMemo(
-    () => [...new Set(trainers.map((trainer) => trainer.specialty))].sort(),
-    []
+    () =>
+      [...new Set(trainers.map((trainer) => trainer.specialty))].sort(),
+    [trainers]
   );
 
   const filteredTrainers = useMemo(() => {
     const searchTerm = query.trim().toLowerCase();
 
     const results = trainers.filter((trainer) => {
-      const matchesSearch = [
+      const searchableText = [
         trainer.name,
         trainer.specialty,
         trainer.location,
-        trainer.experience,
+        trainer.description,
+        `${trainer.experienceYears} years`,
       ]
         .join(" ")
-        .toLowerCase()
-        .includes(searchTerm);
+        .toLowerCase();
 
+      const matchesSearch = searchableText.includes(searchTerm);
       const matchesLocation =
         !filters.location || trainer.location === filters.location;
-
       const matchesSpecialty =
         !filters.specialty || trainer.specialty === filters.specialty;
-
       const matchesPrice =
-        !filters.maxPrice || trainer.price <= Number(filters.maxPrice);
-
-      const matchesAvailability =
-        filters.availability !== "available" || trainer.available;
+        !filters.maxPrice ||
+        (trainer.price > 0 &&
+          trainer.price <= Number(filters.maxPrice));
 
       return (
         matchesSearch &&
         matchesLocation &&
         matchesSpecialty &&
-        matchesPrice &&
-        matchesAvailability
+        matchesPrice
       );
     });
 
     switch (filters.sort) {
-      case "rating":
-        return results.sort((a, b) => b.rating - a.rating);
       case "price-low":
-        return results.sort((a, b) => a.price - b.price);
+        return [...results].sort((a, b) => {
+          if (a.price === 0) return 1;
+          if (b.price === 0) return -1;
+          return a.price - b.price;
+        });
       case "price-high":
-        return results.sort((a, b) => b.price - a.price);
+        return [...results].sort((a, b) => b.price - a.price);
+      case "experience":
+        return [...results].sort(
+          (a, b) => b.experienceYears - a.experienceYears
+        );
       default:
         return results;
     }
-  }, [query, filters]);
+  }, [trainers, query, filters]);
 
   const activeFilterCount = [
     filters.location,
     filters.specialty,
     filters.maxPrice,
-    filters.availability,
   ].filter(Boolean).length;
 
   function clearAll() {
@@ -97,6 +157,7 @@ export default function TrainerDirectory() {
       <div className="mb-6 flex flex-col gap-4 sm:flex-row">
         <div className="flex flex-1 items-center gap-3 rounded-xl border border-white/10 bg-[#222723] px-4">
           <Search size={19} className="shrink-0 text-[#C7F36B]" />
+
           <input
             type="search"
             value={query}
@@ -105,6 +166,7 @@ export default function TrainerDirectory() {
             aria-label="Search trainers"
             className="w-full bg-transparent py-4 text-sm text-white outline-none placeholder:text-gray-500"
           />
+
           {query && (
             <button
               type="button"
@@ -149,8 +211,13 @@ export default function TrainerDirectory() {
                 Personal trainers
               </h2>
               <p className="mt-1 text-sm text-gray-400">
-                {filteredTrainers.length}{" "}
-                {filteredTrainers.length === 1 ? "trainer" : "trainers"} found
+                {loading
+                  ? "Loading trainers..."
+                  : `${filteredTrainers.length} ${
+                      filteredTrainers.length === 1
+                        ? "trainer"
+                        : "trainers"
+                    } found`}
               </p>
             </div>
 
@@ -165,7 +232,34 @@ export default function TrainerDirectory() {
             )}
           </div>
 
-          {filteredTrainers.length > 0 ? (
+          {loading ? (
+            <div className="flex min-h-72 flex-col items-center justify-center rounded-2xl border border-white/10 bg-[#222723]/50 p-8 text-center">
+              <LoaderCircle
+                size={32}
+                className="animate-spin text-[#C7F36B]"
+              />
+              <p className="mt-4 text-sm text-gray-400">
+                Finding trainers for you...
+              </p>
+            </div>
+          ) : error ? (
+            <div className="flex min-h-72 flex-col items-center justify-center rounded-2xl border border-white/10 bg-[#222723]/50 p-8 text-center">
+              <AlertCircle size={30} className="text-red-400" />
+              <h3 className="mt-4 text-lg font-bold">
+                Unable to load trainers
+              </h3>
+              <p className="mt-2 max-w-sm text-sm text-gray-400">
+                {error}
+              </p>
+              <button
+                type="button"
+                onClick={() => void fetchTrainers()}
+                className="mt-5 rounded-full bg-[#C7F36B] px-5 py-3 text-sm font-bold text-[#171A18] hover:bg-white"
+              >
+                Try again
+              </button>
+            </div>
+          ) : filteredTrainers.length > 0 ? (
             <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
               {filteredTrainers.map((trainer) => (
                 <TrainerCard key={trainer.id} trainer={trainer} />
@@ -177,18 +271,24 @@ export default function TrainerDirectory() {
                 <Users size={28} className="text-[#C7F36B]" />
               </div>
               <h3 className="mt-4 text-lg font-bold">
-                No trainers found
+                {trainers.length === 0
+                  ? "No trainers listed yet"
+                  : "No trainers found"}
               </h3>
               <p className="mt-2 max-w-sm text-sm leading-6 text-gray-400">
-                Try changing your search or removing a filter to see more trainers.
+                {trainers.length === 0
+                  ? "Approved trainers will appear here when their profiles are published."
+                  : "Try changing your search or removing a filter to see more trainers."}
               </p>
-              <button
-                type="button"
-                onClick={clearAll}
-                className="mt-5 rounded-full bg-[#C7F36B] px-5 py-3 text-sm font-bold text-[#171A18] hover:bg-white"
-              >
-                Clear search and filters
-              </button>
+              {(query || activeFilterCount > 0) && (
+                <button
+                  type="button"
+                  onClick={clearAll}
+                  className="mt-5 rounded-full bg-[#C7F36B] px-5 py-3 text-sm font-bold text-[#171A18] hover:bg-white"
+                >
+                  Clear search and filters
+                </button>
+              )}
             </div>
           )}
         </div>

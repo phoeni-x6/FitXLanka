@@ -1,13 +1,12 @@
 
 "use client";
 
-import { SlidersHorizontal, RotateCcw } from "lucide-react";
+import { RotateCcw, SlidersHorizontal } from "lucide-react";
 
 export type TrainerFiltersState = {
   location: string;
   specialty: string;
   maxPrice: string;
-  availability: string;
   sort: string;
 };
 
@@ -39,7 +38,6 @@ export default function TrainerFilters({
       location: "",
       specialty: "",
       maxPrice: "",
-      availability: "",
       sort: "recommended",
     });
   }
@@ -70,10 +68,13 @@ export default function TrainerFilters({
           >
             Location
           </label>
+
           <select
             id="trainer-location"
             value={filters.location}
-            onChange={(e) => update("location", e.target.value)}
+            onChange={(event) =>
+              update("location", event.target.value)
+            }
             className={selectClass}
           >
             <option value="">All locations</option>
@@ -92,10 +93,13 @@ export default function TrainerFilters({
           >
             Training specialty
           </label>
+
           <select
             id="trainer-specialty"
             value={filters.specialty}
-            onChange={(e) => update("specialty", e.target.value)}
+            onChange={(event) =>
+              update("specialty", event.target.value)
+            }
             className={selectClass}
           >
             <option value="">All specialties</option>
@@ -114,10 +118,13 @@ export default function TrainerFilters({
           >
             Maximum price per session
           </label>
+
           <select
             id="trainer-price"
             value={filters.maxPrice}
-            onChange={(e) => update("maxPrice", e.target.value)}
+            onChange={(event) =>
+              update("maxPrice", event.target.value)
+            }
             className={selectClass}
           >
             <option value="">Any price</option>
@@ -125,35 +132,8 @@ export default function TrainerFilters({
             <option value="3000">Up to LKR 3,000</option>
             <option value="3500">Up to LKR 3,500</option>
             <option value="4000">Up to LKR 4,000</option>
+            <option value="5000">Up to LKR 5,000</option>
           </select>
-        </div>
-
-        <div>
-          <p className="mb-3 text-sm font-medium text-gray-300">
-            Availability
-          </p>
-
-          <div className="space-y-3">
-            {[
-              { label: "Any availability", value: "" },
-              { label: "Available now", value: "available" },
-            ].map((option) => (
-              <label
-                key={option.value || "any"}
-                className="flex cursor-pointer items-center gap-3 text-sm text-gray-400"
-              >
-                <input
-                  type="radio"
-                  name="availability"
-                  value={option.value}
-                  checked={filters.availability === option.value}
-                  onChange={() => update("availability", option.value)}
-                  className="accent-[#C7F36B]"
-                />
-                {option.label}
-              </label>
-            ))}
-          </div>
         </div>
 
         <div>
@@ -163,14 +143,15 @@ export default function TrainerFilters({
           >
             Sort by
           </label>
+
           <select
             id="trainer-sort"
             value={filters.sort}
-            onChange={(e) => update("sort", e.target.value)}
+            onChange={(event) => update("sort", event.target.value)}
             className={selectClass}
           >
             <option value="recommended">Recommended</option>
-            <option value="rating">Highest rated</option>
+            <option value="experience">Most experienced</option>
             <option value="price-low">Price: low to high</option>
             <option value="price-high">Price: high to low</option>
           </select>
