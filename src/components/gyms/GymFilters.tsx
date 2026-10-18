@@ -1,3 +1,4 @@
+
 "use client";
 
 import { RotateCcw, SlidersHorizontal } from "lucide-react";
@@ -42,7 +43,10 @@ export default function GymFilters({
     <aside className="rounded-2xl border border-white/10 bg-[#222723] p-5">
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <SlidersHorizontal size={18} className="text-[#C7F36B]" />
+          <SlidersHorizontal
+            size={18}
+            className="text-[#C7F36B]"
+          />
           <h2 className="font-semibold">Filters</h2>
         </div>
 
@@ -58,10 +62,15 @@ export default function GymFilters({
 
       <div className="space-y-5">
         <div>
-          <label className="mb-2 block text-sm text-white/65">
+          <label
+            htmlFor="gym-location"
+            className="mb-2 block text-sm text-white/65"
+          >
             Location
           </label>
+
           <select
+            id="gym-location"
             value={filters.location}
             onChange={(e) => update("location", e.target.value)}
             className={selectClass}
@@ -76,10 +85,15 @@ export default function GymFilters({
         </div>
 
         <div>
-          <label className="mb-2 block text-sm text-white/65">
+          <label
+            htmlFor="gym-category"
+            className="mb-2 block text-sm text-white/65"
+          >
             Gym type
           </label>
+
           <select
+            id="gym-category"
             value={filters.category}
             onChange={(e) => update("category", e.target.value)}
             className={selectClass}
@@ -94,10 +108,15 @@ export default function GymFilters({
         </div>
 
         <div>
-          <label className="mb-2 block text-sm text-white/65">
+          <label
+            htmlFor="gym-max-price"
+            className="mb-2 block text-sm text-white/65"
+          >
             Monthly membership
           </label>
+
           <select
+            id="gym-max-price"
             value={filters.maxPrice}
             onChange={(e) => update("maxPrice", e.target.value)}
             className={selectClass}
@@ -111,16 +130,20 @@ export default function GymFilters({
         </div>
 
         <div>
-          <label className="mb-2 block text-sm text-white/65">
+          <label
+            htmlFor="gym-sort"
+            className="mb-2 block text-sm text-white/65"
+          >
             Sort by
           </label>
+
           <select
+            id="gym-sort"
             value={filters.sort}
             onChange={(e) => update("sort", e.target.value)}
             className={selectClass}
           >
             <option value="recommended">Recommended</option>
-            <option value="rating">Highest rated</option>
             <option value="price-low">Price: low to high</option>
             <option value="price-high">Price: high to low</option>
             <option value="name">Name: A–Z</option>

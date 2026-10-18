@@ -1,35 +1,74 @@
+
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   ArrowLeft,
   ArrowUpRight,
   CheckCircle2,
-  Clock,
   Dumbbell,
   MapPin,
   ShieldCheck,
-  Star,
 } from "lucide-react";
 
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import GymGallery from "@/components/gyms/GymGallery";
-import { gyms } from "@/data/gyms";
+import { createClient } from "@/lib/supabase/client";
 
 type Props = {
   params: Promise<{ id: string }>;
 };
 
+type GymProfile = {
+  id: string;
+  gym_name: string;
+  description: string | null;
+  location: string;
+  category: string | null;
+  price_from: number | string | null;
+  features: string[] | null;
+  main_image_url: string | null;
+  gallery_images: string[] | null;
+};
+
 export default async function GymProfilePage({ params }: Props) {
   const { id } = await params;
-  const gym = gyms.find((item) => item.id === Number(id));
+  const supabase = createClient();
 
-  if (!gym) {
+  const { data, error } = await supabase
+    .from("gym_profiles")
+    .select(
+      "id, gym_name, description, location, category, price_from, features, main_image_url, gallery_images"
+    )
+    .eq("id", id)
+    .eq("is_published", true)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Failed to load gym profile:", error);
+    throw new Error("Unable to load this gym profile. Please try again.");
+  }
+
+  if (!data) {
     notFound();
   }
 
-  const galleryImages =
-    gym.gallery?.length > 0 ? gym.gallery : [gym.image];
+  const gym = data as GymProfile;
+  const priceFrom = Number(gym.price_from ?? 0);
+
+  const galleryImages = Array.from(
+    new Set(
+      [gym.main_image_url, ...(gym.gallery_images ?? [])].filter(
+        (image): image is string =>
+          typeof image === "string" && image.trim().length > 0
+      )
+    )
+  );
+
+  const features = gym.features ?? [];
+  const description =
+    gym.description?.trim() ||
+    "Contact this gym to learn more about its training facilities, membership options, and available services.";
 
   return (
     <>
@@ -49,43 +88,49 @@ export default async function GymProfilePage({ params }: Props) {
 
         {/* Gym heading */}
         <section className="mx-auto max-w-7xl px-4 pb-6 pt-6 sm:px-6 lg:px-8">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-            <div>
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+            <div className="min-w-0">
               <span className="inline-flex rounded-full border border-[#C7F36B]/20 bg-[#C7F36B]/10 px-3 py-1.5 text-xs font-medium text-[#C7F36B]">
-                {gym.category}
+                {gym.category || "Fitness Centre"}
               </span>
 
-              <h1 className="mt-4 text-3xl font-semibold tracking-tight sm:text-5xl">
-                {gym.name}
+              <h1 className="mt-4 break-words text-3xl font-semibold tracking-tight sm:text-5xl">
+                {gym.gym_name}
               </h1>
 
               <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-white/60">
                 <span className="flex items-center gap-2">
-                  <MapPin size={16} className="text-[#C7F36B]" />
+                  <MapPin size={16} className="shrink-0 text-[#C7F36B]" />
                   {gym.location}
                 </span>
 
-                <span className="flex items-center gap-1.5">
-                  <Star
+                <span className="flex items-center gap-2">
+                  <ShieldCheck
                     size={16}
-                    className="fill-[#C7F36B] text-[#C7F36B]"
+                    className="text-[#C7F36B]"
                   />
-                  {gym.rating.toFixed(1)}
-                  <span className="text-white/40">demo rating</span>
+                  Listed on FitXLanka
                 </span>
               </div>
             </div>
 
-            <div className="shrink-0">
+            <div className="shrink-0 rounded-xl border border-white/10 bg-[#222723] px-5 py-4">
               <p className="text-xs text-white/40">
                 Monthly membership from
               </p>
-              <p className="mt-1 text-xl font-semibold text-[#C7F36B]">
-                LKR {gym.priceFrom.toLocaleString("en-LK")}
-                <span className="ml-1 text-sm font-normal text-white/40">
-                  / month
-                </span>
-              </p>
+
+              {priceFrom > 0 ? (
+                <p className="mt-1 text-xl font-semibold text-[#C7F36B]">
+                  LKR {priceFrom.toLocaleString("en-LK")}
+                  <span className="ml-1 text-sm font-normal text-white/40">
+                    / month
+                  </span>
+                </p>
+              ) : (
+                <p className="mt-1 text-xl font-semibold text-[#C7F36B]">
+                  Contact gym
+                </p>
+              )}
             </div>
           </div>
         </section>
@@ -93,7 +138,7 @@ export default async function GymProfilePage({ params }: Props) {
         {/* Gym photo gallery */}
         <section className="mx-auto max-w-7xl px-4 pb-10 sm:px-6 lg:px-8">
           <GymGallery
-            name={gym.name}
+            name={gym.gym_name}
             images={galleryImages}
           />
         </section>
@@ -111,17 +156,19 @@ export default async function GymProfilePage({ params }: Props) {
                 Your next step starts here
               </h2>
 
-              <p className="mt-4 leading-7 text-white/55">
-                Explore the facilities and training options available at{" "}
-                {gym.name}. Compare membership costs and find out whether
-                this gym fits your training routine and fitness goals.
+              <p className="mt-4 whitespace-pre-line leading-7 text-white/60">
+                {description}
               </p>
 
-              <p className="mt-3 text-sm leading-6 text-white/40">
-                This is a demonstration profile. Contact details,
-                opening hours, exact facilities, and other gym information
-                will be added when verified listings become available.
-              </p>
+              <div className="mt-6 flex flex-wrap gap-3">
+                <span className="rounded-full border border-white/10 px-3 py-2 text-xs text-white/55">
+                  {gym.category || "Fitness Centre"}
+                </span>
+
+                <span className="rounded-full border border-white/10 px-3 py-2 text-xs text-white/55">
+                  Sri Lanka
+                </span>
+              </div>
             </div>
 
             {/* Facilities */}
@@ -136,48 +183,71 @@ export default async function GymProfilePage({ params }: Props) {
                     Facilities &amp; features
                   </h2>
                   <p className="mt-1 text-sm text-white/45">
-                    Listed features for this demo profile
+                    Features provided by this gym
                   </p>
                 </div>
               </div>
 
-              <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                {gym.features.map((feature) => (
-                  <div
-                    key={feature}
-                    className="flex items-center gap-3 rounded-xl border border-white/10 bg-[#171A18] p-4"
-                  >
-                    <CheckCircle2
-                      size={18}
-                      className="shrink-0 text-[#C7F36B]"
-                    />
-                    <span className="text-sm text-white/75">
-                      {feature}
-                    </span>
-                  </div>
-                ))}
-              </div>
+              {features.length > 0 ? (
+                <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                  {features.map((feature, index) => (
+                    <div
+                      key={`${feature}-${index}`}
+                      className="flex items-center gap-3 rounded-xl border border-white/10 bg-[#171A18] p-4"
+                    >
+                      <CheckCircle2
+                        size={18}
+                        className="shrink-0 text-[#C7F36B]"
+                      />
+                      <span className="text-sm text-white/75">
+                        {feature}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="mt-6 rounded-xl border border-dashed border-white/10 p-6 text-center">
+                  <Dumbbell
+                    size={24}
+                    className="mx-auto text-white/30"
+                  />
+                  <p className="mt-3 text-sm text-white/55">
+                    Facility information has not been added yet.
+                  </p>
+                  <p className="mt-1 text-xs text-white/35">
+                    Contact the gym to learn about its available equipment
+                    and services.
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Location */}
             <div className="rounded-2xl border border-white/10 bg-[#222723] p-6 sm:p-8">
               <div className="flex items-center gap-3">
-                <MapPin size={21} className="text-[#C7F36B]" />
-                <h2 className="text-xl font-semibold">Location</h2>
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#C7F36B]/10 text-[#C7F36B]">
+                  <MapPin size={21} />
+                </div>
+
+                <div>
+                  <h2 className="text-xl font-semibold">Location</h2>
+                  <p className="mt-1 text-sm text-white/45">
+                    Find this gym in your area
+                  </p>
+                </div>
               </div>
 
-              <p className="mt-4 text-white/65">{gym.location}</p>
+              <p className="mt-5 text-white/75">{gym.location}</p>
 
               <p className="mt-2 text-sm leading-6 text-white/40">
-                A full address and map can be added once the gym owner
-                submits their verified business details.
+                Contact the gym for its full address and directions.
               </p>
             </div>
           </div>
 
-          {/* Membership card */}
+          {/* Membership and enquiry card */}
           <aside className="h-fit rounded-2xl border border-white/10 bg-[#222723] p-6 lg:sticky lg:top-24">
-            <div className="flex items-center gap-2 text-sm text-white/50">
+            <div className="flex items-center gap-2 text-sm text-white/55">
               <ShieldCheck size={17} className="text-[#C7F36B]" />
               Membership information
             </div>
@@ -186,62 +256,78 @@ export default async function GymProfilePage({ params }: Props) {
               Monthly membership from
             </p>
 
-            <div className="mt-2 flex flex-wrap items-baseline gap-2">
-              <span className="text-3xl font-semibold text-[#C7F36B]">
-                LKR {gym.priceFrom.toLocaleString("en-LK")}
-              </span>
-              <span className="text-sm text-white/40">/ month</span>
-            </div>
+            {priceFrom > 0 ? (
+              <div className="mt-2">
+                <span className="text-3xl font-semibold text-[#C7F36B]">
+                  LKR {priceFrom.toLocaleString("en-LK")}
+                </span>
+                <span className="ml-1 text-sm text-white/40">
+                  / month
+                </span>
+              </div>
+            ) : (
+              <p className="mt-2 text-2xl font-semibold text-[#C7F36B]">
+                Contact gym
+              </p>
+            )}
 
             <p className="mt-3 text-sm leading-6 text-white/45">
-              This is an indicative demo price, not a confirmed offer.
-              Actual plans and fees may differ.
+              {priceFrom > 0
+                ? "This is the starting price listed by the gym. Contact the owner to confirm available plans, fees, and membership conditions."
+                : "Contact the gym to ask about membership plans, pricing, and available facilities."}
             </p>
 
             <div className="my-6 border-t border-white/10" />
 
-            <div className="space-y-4">
+            <div className="space-y-5">
               <div className="flex items-start gap-3">
-                <MapPin size={17} className="mt-0.5 text-white/40" />
-                <div>
+                <MapPin size={17} className="mt-0.5 shrink-0 text-white/40" />
+                <div className="min-w-0">
                   <p className="text-sm font-medium">Location</p>
-                  <p className="mt-1 text-sm text-white/50">
+                  <p className="mt-1 break-words text-sm text-white/50">
                     {gym.location}
                   </p>
                 </div>
               </div>
 
               <div className="flex items-start gap-3">
-                <Star size={17} className="mt-0.5 text-white/40" />
+                <Dumbbell size={17} className="mt-0.5 shrink-0 text-white/40" />
                 <div>
-                  <p className="text-sm font-medium">Demo rating</p>
+                  <p className="text-sm font-medium">Gym category</p>
                   <p className="mt-1 text-sm text-white/50">
-                    {gym.rating.toFixed(1)} / 5.0
+                    {gym.category || "Fitness Centre"}
                   </p>
                 </div>
               </div>
 
               <div className="flex items-start gap-3">
-                <Clock size={17} className="mt-0.5 text-white/40" />
+                <CheckCircle2
+                  size={17}
+                  className="mt-0.5 shrink-0 text-white/40"
+                />
                 <div>
-                  <p className="text-sm font-medium">Opening hours</p>
+                  <p className="text-sm font-medium">Listed facilities</p>
                   <p className="mt-1 text-sm text-white/50">
-                    To be confirmed
+                    {features.length > 0
+                      ? `${features.length} ${
+                          features.length === 1 ? "feature" : "features"
+                        } available`
+                      : "Not provided yet"}
                   </p>
                 </div>
               </div>
             </div>
 
             <Link
-              href={`/bookings?gym=${gym.id}`}
+              href={`/bookings?gym=${encodeURIComponent(gym.id)}`}
               className="mt-7 flex w-full items-center justify-center gap-2 rounded-xl bg-[#C7F36B] px-5 py-3.5 text-sm font-semibold text-[#171A18] transition hover:bg-[#d5fa8b]"
             >
-              Continue to booking
+              Contact / Enquire
               <ArrowUpRight size={17} />
             </Link>
 
             <p className="mt-3 text-center text-xs leading-5 text-white/35">
-              Booking functionality will be connected in the next stage.
+              Continue to the enquiry page to find out more about this gym.
             </p>
           </aside>
         </section>

@@ -1,15 +1,42 @@
+
 "use client";
 
-import { useMemo, useState } from "react";
-import { Search, SlidersHorizontal, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Search,
+  SlidersHorizontal,
+  X,
+  LoaderCircle,
+  AlertCircle,
+  Dumbbell,
+} from "lucide-react";
 
-import { gyms } from "@/data/gyms";
-import GymCard from "@/components/gyms/GymCard";
+import { createClient } from "@/lib/supabase/client";
+import GymCard, {
+  type DirectoryGym,
+} from "@/components/gyms/GymCard";
 import GymFilters, {
   type GymFiltersState,
 } from "@/components/gyms/GymFilters";
 
+type GymProfileRow = {
+  id: string;
+  gym_name: string;
+  description: string | null;
+  location: string;
+  category: string | null;
+  price_from: number | string;
+  features: string[] | null;
+  main_image_url: string | null;
+  gallery_images: string[] | null;
+};
+
 export default function GymDirectory() {
+  const [gyms, setGyms] = useState<DirectoryGym[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [retryKey, setRetryKey] = useState(0);
+
   const [query, setQuery] = useState("");
   const [showFilters, setShowFilters] = useState(false);
 
@@ -20,14 +47,84 @@ export default function GymDirectory() {
     sort: "recommended",
   });
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchGyms() {
+      setLoading(true);
+      setError("");
+
+      try {
+        const supabase = createClient();
+
+        const { data, error: queryError } = await supabase
+          .from("gym_profiles")
+          .select(
+            "id, gym_name, description, location, category, price_from, features, main_image_url, gallery_images"
+          )
+          .eq("is_published", true)
+          .order("created_at", { ascending: false });
+
+        if (queryError) {
+          throw queryError;
+        }
+
+        const rows = (data ?? []) as GymProfileRow[];
+
+        const mappedGyms: DirectoryGym[] = rows.map((gym) => ({
+          id: gym.id,
+          name: gym.gym_name,
+          description: gym.description ?? "",
+          location: gym.location,
+          category: gym.category || "General",
+          priceFrom: Number(gym.price_from ?? 0),
+          features: gym.features ?? [],
+          image:
+            gym.main_image_url ||
+            gym.gallery_images?.[0] ||
+            null,
+          galleryImages: gym.gallery_images ?? [],
+        }));
+
+        if (!cancelled) {
+          setGyms(mappedGyms);
+        }
+      } catch (err) {
+        console.error("Failed to fetch gym directory:", err);
+
+        if (!cancelled) {
+          setError(
+            "We couldn't load the gym directory. Please try again."
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    fetchGyms();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [retryKey]);
+
   const locations = useMemo(
-    () => [...new Set(gyms.map((gym) => gym.location))].sort(),
-    []
+    () =>
+      [...new Set(gyms.map((gym) => gym.location))]
+        .filter(Boolean)
+        .sort(),
+    [gyms]
   );
 
   const categories = useMemo(
-    () => [...new Set(gyms.map((gym) => gym.category))].sort(),
-    []
+    () =>
+      [...new Set(gyms.map((gym) => gym.category))]
+        .filter(Boolean)
+        .sort(),
+    [gyms]
   );
 
   const filteredGyms = useMemo(() => {
@@ -40,8 +137,11 @@ export default function GymDirectory() {
           gym.name,
           gym.location,
           gym.category,
+          gym.description,
           ...gym.features,
-        ].some((value) => value.toLowerCase().includes(searchText));
+        ].some((value) =>
+          value.toLowerCase().includes(searchText)
+        );
 
       const matchesLocation =
         !filters.location || gym.location === filters.location;
@@ -62,26 +162,30 @@ export default function GymDirectory() {
     });
 
     switch (filters.sort) {
-      case "rating":
-        results = [...results].sort((a, b) => b.rating - a.rating);
-        break;
       case "price-low":
-        results = [...results].sort((a, b) => a.priceFrom - b.priceFrom);
+        results = [...results].sort(
+          (a, b) => a.priceFrom - b.priceFrom
+        );
         break;
+
       case "price-high":
-        results = [...results].sort((a, b) => b.priceFrom - a.priceFrom);
+        results = [...results].sort(
+          (a, b) => b.priceFrom - a.priceFrom
+        );
         break;
+
       case "name":
         results = [...results].sort((a, b) =>
           a.name.localeCompare(b.name)
         );
         break;
+
       default:
         break;
     }
 
     return results;
-  }, [query, filters]);
+  }, [gyms, query, filters]);
 
   const resetAll = () => {
     setQuery("");
@@ -93,13 +197,23 @@ export default function GymDirectory() {
     });
   };
 
+  const hasActiveFilters =
+    query.trim() !== "" ||
+    filters.location !== "" ||
+    filters.category !== "" ||
+    filters.maxPrice !== "" ||
+    filters.sort !== "recommended";
+
   return (
     <section className="mx-auto max-w-7xl px-4 pb-20 sm:px-6 lg:px-8">
       <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <p className="text-sm text-white/45">
-            Showing {filteredGyms.length} of {gyms.length} gyms
+            {loading
+              ? "Loading available gyms..."
+              : `Showing ${filteredGyms.length} of ${gyms.length} gyms`}
           </p>
+
           <h2 className="mt-1 text-2xl font-semibold">
             Explore gyms
           </h2>
@@ -107,7 +221,11 @@ export default function GymDirectory() {
 
         <div className="flex flex-col gap-3 sm:flex-row">
           <div className="flex min-w-0 items-center gap-3 rounded-xl border border-white/10 bg-[#222723] px-4 py-3 sm:w-80">
-            <Search size={18} className="shrink-0 text-white/40" />
+            <Search
+              size={18}
+              className="shrink-0 text-white/40"
+            />
+
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -115,6 +233,7 @@ export default function GymDirectory() {
               className="w-full bg-transparent text-sm outline-none placeholder:text-white/35"
               aria-label="Search gyms"
             />
+
             {query && (
               <button
                 type="button"
@@ -148,8 +267,57 @@ export default function GymDirectory() {
           />
         </div>
 
-        <div>
-          {filteredGyms.length > 0 ? (
+        <div className="min-w-0">
+          {loading ? (
+            <div className="flex min-h-72 flex-col items-center justify-center rounded-2xl border border-white/10 bg-[#222723]/50">
+              <LoaderCircle
+                size={32}
+                className="animate-spin text-[#C7F36B]"
+              />
+              <p className="mt-4 text-sm text-white/55">
+                Finding gyms for you...
+              </p>
+            </div>
+          ) : error ? (
+            <div className="rounded-2xl border border-red-400/20 bg-red-400/5 px-6 py-14 text-center">
+              <AlertCircle
+                size={30}
+                className="mx-auto text-red-300"
+              />
+
+              <h3 className="mt-4 text-lg font-semibold">
+                Unable to load gyms
+              </h3>
+
+              <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-white/50">
+                {error}
+              </p>
+
+              <button
+                type="button"
+                onClick={() => setRetryKey((key) => key + 1)}
+                className="mt-5 rounded-xl bg-[#C7F36B] px-5 py-3 text-sm font-semibold text-[#171A18] transition hover:bg-[#d5fa8b]"
+              >
+                Try again
+              </button>
+            </div>
+          ) : gyms.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-white/15 px-6 py-16 text-center">
+              <Dumbbell
+                size={32}
+                className="mx-auto text-[#C7F36B]"
+              />
+
+              <h3 className="mt-4 text-lg font-semibold">
+                No gyms listed yet
+              </h3>
+
+              <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-white/50">
+                Approved gyms will appear here once their profiles
+                are published. Please check back soon.
+              </p>
+            </div>
+          ) : filteredGyms.length > 0 ? (
             <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-2">
               {filteredGyms.map((gym) => (
                 <GymCard key={gym.id} gym={gym} />
@@ -157,36 +325,33 @@ export default function GymDirectory() {
             </div>
           ) : (
             <div className="rounded-2xl border border-dashed border-white/15 px-6 py-16 text-center">
-              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-white/5">
-                <Search size={21} className="text-white/50" />
-              </div>
+              <Search
+                size={28}
+                className="mx-auto text-white/50"
+              />
 
-              <h3 className="text-lg font-semibold">
+              <h3 className="mt-4 text-lg font-semibold">
                 No gyms found
               </h3>
 
               <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-white/50">
-                Try changing your search or filters to find a gym that
-                matches your needs.
+                Try changing your search or filters to find a gym
+                that matches your needs.
               </p>
 
-              <button
-                type="button"
-                onClick={resetAll}
-                className="mt-5 rounded-xl bg-[#C7F36B] px-5 py-3 text-sm font-semibold text-[#171A18] transition hover:bg-[#d5fa8b]"
-              >
-                Clear all filters
-              </button>
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={resetAll}
+                  className="mt-5 rounded-xl bg-[#C7F36B] px-5 py-3 text-sm font-semibold text-[#171A18] transition hover:bg-[#d5fa8b]"
+                >
+                  Clear all filters
+                </button>
+              )}
             </div>
           )}
         </div>
       </div>
-
-      <p className="mt-8 text-xs leading-5 text-white/35">
-        Demo listings and membership prices are sample data for the UI
-        prototype. Confirm actual facilities, availability, and prices
-        with each gym before making a booking.
-      </p>
     </section>
   );
 }
