@@ -93,16 +93,17 @@ export default function RegisterForm({ initialRole }: Props) {
     try {
       const supabase = createClient();
 
-      const { data, error: signUpError } =
-        await supabase.auth.signUp({
-          email: email.trim().toLowerCase(),
-          password,
-          options: {
-            data: {
-              display_name: fullName.trim(),
-            },
-          },
-        });
+     const { data, error: signUpError } =
+  await supabase.auth.signUp({
+    email: email.trim().toLowerCase(),
+    password,
+    options: {
+      data: {
+        display_name: fullName.trim(),
+      },
+      emailRedirectTo: `${window.location.origin}/auth/confirm`,
+    },
+  });
 
       if (signUpError) {
         setError(signUpError.message);
