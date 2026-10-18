@@ -1,4 +1,3 @@
-
 "use client";
 
 import Image from "next/image";
@@ -39,6 +38,9 @@ export default function Navbar() {
 
   const isTrainer = userRole === "trainer";
   const isGymOwner = userRole === "gym_owner";
+  const isClient = userRole === "client";
+  const isAdmin = userRole === "admin";
+  const isAuthenticatedRole = isTrainer || isGymOwner || isClient;
 
   const checkUserStatus = useCallback(async () => {
     const supabase = createClient();
@@ -206,33 +208,92 @@ export default function Navbar() {
   );
 
   const profileIconClass = (open: boolean) =>
-    `flex h-11 w-11 items-center justify-center rounded-full border transition ${
+    `flex h-11 w-11 items-center justify-center gap-1 rounded-full border transition ${
       open
         ? "border-brand-lime bg-brand-lime/15 text-brand-lime"
         : "border-white/10 bg-white/[0.04] text-white hover:border-brand-lime/50 hover:text-brand-lime"
     }`;
 
-  const trainerProfileDropdown = (
-    <div className="absolute right-0 top-full z-[60] mt-3 w-64 overflow-hidden rounded-2xl border border-white/10 bg-[#222723] p-2 shadow-2xl shadow-black/40">
-      <div className="border-b border-white/10 px-3 py-3">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-lime/10">
-            <UserRound className="h-5 w-5 text-brand-lime" />
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-white">Trainer account</p>
-            <p className="mt-0.5 text-xs text-gray-400">
-              Manage your coaching profile
-            </p>
-          </div>
+  const profileDropdownHeader = (
+    icon: React.ReactNode,
+    title: string,
+    description: string
+  ) => (
+    <div className="border-b border-white/10 px-3 py-3">
+      <div className="flex items-center gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-lime/10">
+          {icon}
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-white">{title}</p>
+          <p className="mt-0.5 text-xs text-gray-400">{description}</p>
         </div>
       </div>
+    </div>
+  );
+
+  const dropdownLinkClass =
+    "flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-gray-200 transition hover:bg-brand-lime/10 hover:text-brand-lime";
+
+  const logoutButton = (
+    <div className="border-t border-white/10 pt-2">
+      <button
+        type="button"
+        onClick={handleLogout}
+        disabled={loggingOut}
+        className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium text-red-400 transition hover:bg-red-500/10 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        <LogOut className="h-4 w-4" />
+        {loggingOut ? "Logging out..." : "Log Out"}
+      </button>
+    </div>
+  );
+
+  const clientProfileDropdown = (
+    <div className="absolute right-0 top-full z-[60] mt-3 w-64 overflow-hidden rounded-2xl border border-white/10 bg-[#222723] p-2 shadow-2xl shadow-black/40">
+      {profileDropdownHeader(
+        <UserRound className="h-5 w-5 text-brand-lime" />,
+        "Your account",
+        "Manage your fitness journey"
+      )}
+
+      <div className="space-y-1 py-2">
+        <Link
+          href="/dashboard"
+          onClick={closeMenus}
+          className={dropdownLinkClass}
+        >
+          <LayoutDashboard className="h-4 w-4" />
+          <span className="flex-1">My Dashboard</span>
+        </Link>
+
+        <Link
+          href="/dashboard/profile"
+          onClick={closeMenus}
+          className={dropdownLinkClass}
+        >
+          <Settings2 className="h-4 w-4" />
+          <span className="flex-1">My Profile</span>
+        </Link>
+      </div>
+
+      {logoutButton}
+    </div>
+  );
+
+  const trainerProfileDropdown = (
+    <div className="absolute right-0 top-full z-[60] mt-3 w-64 overflow-hidden rounded-2xl border border-white/10 bg-[#222723] p-2 shadow-2xl shadow-black/40">
+      {profileDropdownHeader(
+        <UserRound className="h-5 w-5 text-brand-lime" />,
+        "Trainer account",
+        "Manage your coaching profile"
+      )}
 
       <div className="space-y-1 py-2">
         <Link
           href="/trainers/dashboard"
           onClick={closeMenus}
-          className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-gray-200 transition hover:bg-brand-lime/10 hover:text-brand-lime"
+          className={dropdownLinkClass}
         >
           <LayoutDashboard className="h-4 w-4" />
           <span className="flex-1">Trainer Dashboard</span>
@@ -241,48 +302,30 @@ export default function Navbar() {
         <Link
           href="/trainers/dashboard/profile"
           onClick={closeMenus}
-          className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-gray-200 transition hover:bg-brand-lime/10 hover:text-brand-lime"
+          className={dropdownLinkClass}
         >
           <Settings2 className="h-4 w-4" />
           <span className="flex-1">My Profile</span>
         </Link>
       </div>
 
-      <div className="border-t border-white/10 pt-2">
-        <button
-          type="button"
-          onClick={handleLogout}
-          disabled={loggingOut}
-          className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium text-red-400 transition hover:bg-red-500/10 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <LogOut className="h-4 w-4" />
-          {loggingOut ? "Logging out..." : "Log Out"}
-        </button>
-      </div>
+      {logoutButton}
     </div>
   );
 
   const gymOwnerProfileDropdown = (
     <div className="absolute right-0 top-full z-[60] mt-3 w-64 overflow-hidden rounded-2xl border border-white/10 bg-[#222723] p-2 shadow-2xl shadow-black/40">
-      <div className="border-b border-white/10 px-3 py-3">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-lime/10">
-            <Building2 className="h-5 w-5 text-brand-lime" />
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-white">Gym owner account</p>
-            <p className="mt-0.5 text-xs text-gray-400">
-              Manage your gym listing
-            </p>
-          </div>
-        </div>
-      </div>
+      {profileDropdownHeader(
+        <Building2 className="h-5 w-5 text-brand-lime" />,
+        "Gym owner account",
+        "Manage your gym listing"
+      )}
 
       <div className="space-y-1 py-2">
         <Link
           href="/gyms/dashboard"
           onClick={closeMenus}
-          className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-gray-200 transition hover:bg-brand-lime/10 hover:text-brand-lime"
+          className={dropdownLinkClass}
         >
           <LayoutDashboard className="h-4 w-4" />
           <span className="flex-1">Gym Dashboard</span>
@@ -291,7 +334,7 @@ export default function Navbar() {
         <Link
           href="/gyms/dashboard/profile"
           onClick={closeMenus}
-          className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-gray-200 transition hover:bg-brand-lime/10 hover:text-brand-lime"
+          className={dropdownLinkClass}
         >
           <Settings2 className="h-4 w-4" />
           <span className="flex-1">My Gym Profile</span>
@@ -300,24 +343,51 @@ export default function Navbar() {
         <Link
           href="/gyms/application-status"
           onClick={closeMenus}
-          className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-gray-200 transition hover:bg-brand-lime/10 hover:text-brand-lime"
+          className={dropdownLinkClass}
         >
           <FileCheck2 className="h-4 w-4" />
           <span className="flex-1">Application Details</span>
         </Link>
       </div>
 
-      <div className="border-t border-white/10 pt-2">
-        <button
-          type="button"
-          onClick={handleLogout}
-          disabled={loggingOut}
-          className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium text-red-400 transition hover:bg-red-500/10 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <LogOut className="h-4 w-4" />
-          {loggingOut ? "Logging out..." : "Log Out"}
-        </button>
-      </div>
+      {logoutButton}
+    </div>
+  );
+
+  const profileDropdown = isClient
+    ? clientProfileDropdown
+    : isGymOwner
+      ? gymOwnerProfileDropdown
+      : trainerProfileDropdown;
+
+  const profileMenuLabel = isClient
+    ? "client"
+    : isGymOwner
+      ? "gym owner"
+      : "trainer";
+
+  const profileButton = (
+    <div className="relative">
+      <button
+        type="button"
+        aria-label={`Open ${profileMenuLabel} profile menu`}
+        aria-expanded={profileMenuOpen}
+        onClick={() => setProfileMenuOpen((open) => !open)}
+        className={profileIconClass(profileMenuOpen)}
+      >
+        {isGymOwner ? (
+          <Building2 className="h-5 w-5" />
+        ) : (
+          <UserRound className="h-5 w-5" />
+        )}
+        <ChevronDown
+          className={`h-3 w-3 transition-transform ${
+            profileMenuOpen ? "rotate-180" : ""
+          }`}
+        />
+      </button>
+
+      {profileMenuOpen && profileDropdown}
     </div>
   );
 
@@ -356,67 +426,41 @@ export default function Navbar() {
 
         {/* Desktop actions */}
         <div className="hidden items-center gap-3 md:flex">
-          {authChecked && (isTrainer || isGymOwner) ? (
-            <div className="relative">
-              <button
-                type="button"
-                aria-label={
-                  isGymOwner
-                    ? "Open gym owner profile menu"
-                    : "Open trainer profile menu"
-                }
-                aria-expanded={profileMenuOpen}
-                onClick={() => setProfileMenuOpen((open) => !open)}
-                className={profileIconClass(profileMenuOpen)}
-              >
-                {isGymOwner ? (
-                  <Building2 className="h-5 w-5" />
-                ) : (
-                  <>
-                    <UserRound className="h-5 w-5" />
-                    <ChevronDown className="ml-0.5 h-3 w-3" />
-                  </>
-                )}
-              </button>
-
-              {profileMenuOpen &&
-                (isGymOwner
-                  ? gymOwnerProfileDropdown
-                  : trainerProfileDropdown)}
-            </div>
+          {authChecked && isAuthenticatedRole ? (
+            profileButton
           ) : (
             <>
               {authChecked && hasTrainerApplication && trainerApplicationLink}
               {authChecked && hasGymApplication && gymApplicationLink}
 
-              <Link
-                href="/login"
-                className="rounded-full px-4 py-2 text-sm font-semibold text-white transition hover:text-brand-lime"
-              >
-                Log in
-              </Link>
+              {!isAdmin && (
+                <>
+                  <Link
+                    href="/login"
+                    className="rounded-full px-4 py-2 text-sm font-semibold text-white transition hover:text-brand-lime"
+                  >
+                    Log in
+                  </Link>
 
-              <Link
-                href="/register"
-                className="rounded-full bg-brand-lime px-5 py-2.5 text-sm font-bold text-brand-charcoal transition hover:bg-white"
-              >
-                Get started
-              </Link>
+                  <Link
+                    href="/register"
+                    className="rounded-full bg-brand-lime px-5 py-2.5 text-sm font-bold text-brand-charcoal transition hover:bg-white"
+                  >
+                    Get started
+                  </Link>
+                </>
+              )}
             </>
           )}
         </div>
 
         {/* Mobile actions */}
         <div className="flex items-center gap-2 md:hidden">
-          {authChecked && (isTrainer || isGymOwner) && (
+          {authChecked && isAuthenticatedRole && (
             <div className="relative">
               <button
                 type="button"
-                aria-label={
-                  isGymOwner
-                    ? "Open gym owner profile menu"
-                    : "Open trainer profile menu"
-                }
+                aria-label={`Open ${profileMenuLabel} profile menu`}
                 aria-expanded={profileMenuOpen}
                 onClick={() => {
                   setProfileMenuOpen((open) => !open);
@@ -431,10 +475,7 @@ export default function Navbar() {
                 )}
               </button>
 
-              {profileMenuOpen &&
-                (isGymOwner
-                  ? gymOwnerProfileDropdown
-                  : trainerProfileDropdown)}
+              {profileMenuOpen && profileDropdown}
             </div>
           )}
 
@@ -472,7 +513,7 @@ export default function Navbar() {
               </Link>
             ))}
 
-            {authChecked && !isTrainer && !isGymOwner && (
+            {authChecked && !isAuthenticatedRole && !isAdmin && (
               <>
                 {hasTrainerApplication && (
                   <>
@@ -508,24 +549,47 @@ export default function Navbar() {
               </>
             )}
 
-            {authChecked && (isTrainer || isGymOwner) && (
+            {authChecked && isAdmin && (
+              <Link
+                href="/admin/dashboard"
+                onClick={closeMenus}
+                className="flex items-center gap-3 text-sm text-gray-200 transition hover:text-brand-lime"
+              >
+                <LayoutDashboard className="h-4 w-4" />
+                Admin Dashboard
+              </Link>
+            )}
+
+            {authChecked && isAuthenticatedRole && (
               <>
                 <div className="my-1 border-t border-white/10" />
 
                 <Link
-                  href={isGymOwner ? "/gyms/dashboard" : "/trainers/dashboard"}
+                  href={
+                    isGymOwner
+                      ? "/gyms/dashboard"
+                      : isTrainer
+                        ? "/trainers/dashboard"
+                        : "/dashboard"
+                  }
                   onClick={closeMenus}
                   className="flex items-center gap-3 text-sm text-gray-200 transition hover:text-brand-lime"
                 >
                   <LayoutDashboard className="h-4 w-4" />
-                  {isGymOwner ? "Gym Dashboard" : "Trainer Dashboard"}
+                  {isGymOwner
+                    ? "Gym Dashboard"
+                    : isTrainer
+                      ? "Trainer Dashboard"
+                      : "My Dashboard"}
                 </Link>
 
                 <Link
                   href={
                     isGymOwner
                       ? "/gyms/dashboard/profile"
-                      : "/trainers/dashboard/profile"
+                      : isTrainer
+                        ? "/trainers/dashboard/profile"
+                        : "/dashboard/profile"
                   }
                   onClick={closeMenus}
                   className="flex items-center gap-3 text-sm text-gray-200 transition hover:text-brand-lime"
